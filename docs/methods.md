@@ -18,7 +18,9 @@ attributable to the graph.
 
 - **Step -1 — Repo + docs.** Private repo `sbartek/grn-prior-benchmark`; MkDocs Material docs →
   GitHub Pages; living-docs protocol (update plan/docs/memory/commit after every step).
-- **Step 0 — Environment.** `uv venv --python 3.11` (local Python 3.14 lacks scanpy/torch wheels).
+- **Step 0 — Environment.** ✅ `uv venv --python 3.11` (local Python 3.14 lacks scanpy/torch
+  wheels). Verified: scanpy 1.11.5, torch 2.12.1 (MPS/Apple-GPU available), decoupler 2.1.6,
+  cellxgene-census 1.18.0. Exact pins in `requirements.lock.txt`.
 - **Step 1 — Data.** Fetch CELLxGENE RA PBMC subset (`d18736c3-…`), cache `.h5ad` to `data/`.
 - **Step 2 — Pseudobulk.** Aggregate (donor × cell_type), drop small groups (<~10 cells),
   normalize + log-transform.

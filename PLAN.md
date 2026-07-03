@@ -124,7 +124,10 @@ data/            (gitignored cache)
   (SSH remote). Human-readable docs as **MkDocs Material** in `docs/`, deployed to **GitHub
   Pages** via `.github/workflows/docs.yml`. All docs are plain markdown so they also render
   natively on github.com (fallback if Pages is unavailable on a private repo — see below).
-- **Step 0 — Environment.** `uv venv --python 3.11`; install deps.
+- **Step 0 — Environment.** ✅ `uv venv --python 3.11` (CPython 3.11.14). Installed + smoke-tested:
+  scanpy 1.11.5, anndata 0.12.19, torch 2.12.1 (**MPS available**), decoupler 2.1.6
+  (`dc.op.dorothea` present), cellxgene-census 1.18.0, scikit-learn 1.9.0. Pins in
+  `requirements.txt`; exact freeze in `requirements.lock.txt`.
 - **Step 1 — Data.** Fetch CELLxGENE RA PBMC subset, cache `.h5ad` to `data/`.
 - **Step 2 — Pseudobulk.** Aggregate (donor × cell_type), QC-filter small groups, normalize + log.
 - **Step 3 — Graph + controls.** DoRothEA adjacency on shared genes; rewire / sign-shuffle /
