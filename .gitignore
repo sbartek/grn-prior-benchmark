@@ -1,0 +1,17 @@
+# data cache (large CELLxGENE downloads, pseudobulk artifacts)
+data/
+*.h5ad
+*.h5
+
+# python
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# results artifacts kept in git are small; ignore heavy intermediates
+results/**/*.npz
+results/**/*.parquet
+
+# os
+.DS_Store

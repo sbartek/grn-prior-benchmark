@@ -1,0 +1,13 @@
+# pin at install time; versions below are known-good on Python 3.11 (Mac, uv)
+cellxgene-census
+scanpy
+anndata
+decoupler
+scikit-learn
+torch
+numpy
+pandas
+scipy
+matplotlib
+# optional stretch (GNN); install only if attempting torch_geometric path
+# torch-geometric
