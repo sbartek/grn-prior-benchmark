@@ -141,12 +141,11 @@ data/            (gitignored cache)
 
 **Critical path if short on time:** -1 → 0 → 1 → 2 → 3 → 4 → 5 → (Step 6 corruption test only) → 8.
 
-### GitHub Pages on a private repo — caveat
-Publishing Pages from a **private** repo needs GitHub Pro/Team (free plan only serves Pages
-from public repos). Fallback order: (1) browse docs as markdown on github.com — renders fine,
-zero infra; (2) `mkdocs serve` locally for the live site; (3) flip the repo public *after* the
-submission deadline to publish the Pages site. The Actions workflow is wired so Pages "just
-works" the moment it's enabled/eligible.
+### GitHub Pages — status
+Repo made **public** 2026-07-03; Pages enabled (source = GitHub Actions). **Live site:
+https://sbartek.github.io/grn-prior-benchmark/** (verified HTTP 200). Docs also render as
+markdown on github.com, and `mkdocs serve` works locally.
+*(Historical caveat: private repos need GitHub Pro/Team for Pages — moot now that it's public.)*
 
 ## 12. Living-documentation protocol (update after EVERY step)
 
