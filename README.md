@@ -36,7 +36,8 @@ uv run python scripts/03_run_experiments.py
 ## Notebook
 `notebooks/01_eda_suitability.ipynb` — narrative EDA + dataset-suitability check (composition,
 balance, library sizes, PCA/UMAP showing cell type separates but disease/donor don't, DoRothEA
-graph stats, headline result). Committed with outputs; re-run with:
+graph stats, headline result). **Interactive Plotly (white theme).** Committed with outputs;
+re-run with (needs `plotly`, `umap-learn`, `jupyterlab` in the env):
 
 ```bash
 uv run jupyter nbconvert --to notebook --execute --inplace notebooks/01_eda_suitability.ipynb

@@ -10,5 +10,11 @@ numpy==2.4.6
 pandas==2.3.3
 scipy==1.17.1
 matplotlib==3.11.0
+# notebook / interactive EDA (notebooks/01_eda_suitability.ipynb)
+plotly==6.8.0
+jupyterlab
+jupytext
+nbconvert
+# umap-learn ships with scanpy; used for the UMAP panel
 # optional stretch (GNN); install only if attempting the torch_geometric path
 # torch-geometric

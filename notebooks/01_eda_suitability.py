@@ -17,15 +17,18 @@
 #
 # Headline that falls out below: **cell type separates cleanly and linearly; disease does not,
 # and is aliased with donor** — which is why we treat cell type as the trustworthy readout and
-# disease as suggestive only.
+# disease as suggestive only. Plots are interactive Plotly (white theme).
 
 # %%
 import sys
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import plotly.express as px
+import plotly.io as pio
+
+pio.templates.default = "plotly_white"
 
 sys.path.insert(0, str(Path.cwd().parent / "src"))
 from grn_bench.data import load_aligned  # noqa: E402
@@ -42,12 +45,11 @@ print(f"donors={obs.donor_id.nunique()}  cell_types={obs.cell_type.nunique()}")
 
 # %%
 piv = obs.pivot_table(index="donor_id", columns="cell_type", values="n_cells", aggfunc="sum")
-fig, ax = plt.subplots(figsize=(11, 8))
-im = ax.imshow(np.log1p(piv.fillna(0).values), aspect="auto", cmap="viridis")
-ax.set_xticks(range(piv.shape[1])); ax.set_xticklabels(piv.columns, rotation=90, fontsize=7)
-ax.set_yticks(range(piv.shape[0])); ax.set_yticklabels(piv.index, fontsize=6)
-ax.set_title("cells per (donor x cell_type)  [log1p]"); fig.colorbar(im, shrink=0.6)
-plt.tight_layout(); plt.show()
+fig = px.imshow(np.log1p(piv.fillna(0)), aspect="auto", color_continuous_scale="Viridis",
+                labels=dict(color="log1p cells"), title="cells per (donor × cell_type)")
+fig.update_xaxes(tickangle=45, tickfont_size=9)
+fig.update_layout(height=650, width=1000)
+fig
 
 # %%
 donor_meta = obs.drop_duplicates("donor_id")
@@ -65,14 +67,15 @@ print(f"\ncells/group: min={obs.n_cells.min()} median={int(obs.n_cells.median())
 
 # %%
 lib = np.asarray(d["counts"].sum(1)).ravel()
-fig, ax = plt.subplots(figsize=(6, 3.5))
-ax.hist(np.log10(lib), bins=40, color="#3aa"); ax.set_xlabel("log10 total counts / pseudobulk")
-ax.set_ylabel("# samples"); ax.set_title("pseudobulk library sizes"); plt.tight_layout(); plt.show()
+fig = px.histogram(x=np.log10(lib), nbins=40, title="pseudobulk library sizes",
+                   labels=dict(x="log10 total counts / pseudobulk"))
+fig.update_layout(height=380, width=680, bargap=0.05)
+fig
 
 # %% [markdown]
 # ## 3. The confound, visually: PCA & UMAP of the pseudobulk
 # If cell type is a strong linear signal and disease is not, a 2-D projection should separate
-# **cell type** but mix **disease** and show **donor** substructure.
+# **cell type** but mix **disease** and show **donor** substructure. Hover to inspect points.
 
 # %%
 from sklearn.decomposition import PCA  # noqa: E402
@@ -81,31 +84,54 @@ from sklearn.preprocessing import StandardScaler  # noqa: E402
 Xs = StandardScaler().fit_transform(X)
 pcs = PCA(n_components=30, random_state=0).fit_transform(Xs)
 
-
-def scatter_by(coords, key, title, ax, legend=False):
-    cats = obs[key].astype("category")
-    codes = cats.cat.codes
-    sc = ax.scatter(coords[:, 0], coords[:, 1], c=codes, cmap="tab20", s=14, alpha=0.8)
-    ax.set_title(title); ax.set_xticks([]); ax.set_yticks([])
-    if legend and cats.cat.categories.size <= 16:
-        handles = [plt.Line2D([], [], marker="o", ls="", color=plt.cm.tab20(i / 20))
-                   for i in range(cats.cat.categories.size)]
-        ax.legend(handles, list(cats.cat.categories), fontsize=5, loc="best", ncol=1)
-
-
-fig, axes = plt.subplots(1, 3, figsize=(15, 4.6))
-for ax, key, leg in zip(axes, ["cell_type", "disease", "donor_id"], [True, True, False]):
-    scatter_by(pcs, key, f"PCA — {key}", ax, legend=leg)
-plt.tight_layout(); plt.show()
-
-# %%
 import umap  # noqa: E402
 
 um = umap.UMAP(n_neighbors=15, min_dist=0.3, random_state=0).fit_transform(pcs)
-fig, axes = plt.subplots(1, 3, figsize=(15, 4.6))
-for ax, key, leg in zip(axes, ["cell_type", "disease", "donor_id"], [True, True, False]):
-    scatter_by(um, key, f"UMAP — {key}", ax, legend=leg)
-plt.tight_layout(); plt.show()
+
+emb_df = obs.copy()
+emb_df["PC1"], emb_df["PC2"] = pcs[:, 0], pcs[:, 1]
+emb_df["UMAP1"], emb_df["UMAP2"] = um[:, 0], um[:, 1]
+
+
+def proj(kind, color, showlegend=True):
+    x, y = (("PC1", "PC2") if kind == "PCA" else ("UMAP1", "UMAP2"))
+    fig = px.scatter(emb_df, x=x, y=y, color=color, title=f"{kind} — coloured by {color}",
+                     hover_data=["donor_id", "cell_type", "disease"], opacity=0.85)
+    fig.update_traces(marker_size=7)
+    fig.update_layout(height=460, width=760, showlegend=showlegend,
+                      legend=dict(font_size=9, itemsizing="constant"))
+    return fig
+
+
+# %% [markdown]
+# **PCA coloured by cell type** — clean, well-separated clusters.
+
+# %%
+proj("PCA", "cell_type")
+
+# %% [markdown]
+# **PCA coloured by disease** — RA and normal mixed across every cluster.
+
+# %%
+proj("PCA", "disease")
+
+# %% [markdown]
+# **PCA coloured by donor** — fine substructure within each cell type.
+
+# %%
+proj("PCA", "donor_id", showlegend=False)
+
+# %% [markdown]
+# **UMAP coloured by cell type / disease / donor** — same story, non-linear projection.
+
+# %%
+proj("UMAP", "cell_type")
+
+# %%
+proj("UMAP", "disease")
+
+# %%
+proj("UMAP", "donor_id", showlegend=False)
 
 # %% [markdown]
 # As expected: **cell type** forms clean clusters, **disease** is thoroughly mixed, and **donor**
@@ -121,11 +147,16 @@ out_deg = np.bincount(g["real_cols"], minlength=len(tfs))
 in_deg = np.bincount(g["real_rows"], minlength=len(genes))
 print(f"input genes={len(genes)}  TFs(hidden)={len(tfs)}  edges={len(g['real_rows'])}  "
       f"density={len(g['real_rows'])/(len(genes)*len(tfs)):.4f}")
-fig, axes = plt.subplots(1, 2, figsize=(11, 3.6))
-axes[0].hist(out_deg, bins=40, color="#a55"); axes[0].set_title("TF out-degree (regulon size)")
-axes[0].set_xlabel("# targets"); axes[0].set_ylabel("# TFs")
-axes[1].hist(in_deg, bins=40, color="#55a"); axes[1].set_title("gene in-degree (# regulating TFs)")
-axes[1].set_xlabel("# TFs"); plt.tight_layout(); plt.show()
+
+deg_df = pd.concat([
+    pd.DataFrame({"degree": out_deg, "which": "TF out-degree (regulon size)"}),
+    pd.DataFrame({"degree": in_deg, "which": "gene in-degree (# regulating TFs)"}),
+])
+fig = px.histogram(deg_df, x="degree", facet_col="which", nbins=40,
+                   title="DoRothEA degree distributions")
+fig.update_xaxes(matches=None); fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
+fig.update_layout(height=380, width=1000, showlegend=False)
+fig
 
 # %% [markdown]
 # ## 5. Headline result
@@ -135,10 +166,11 @@ axes[1].set_xlabel("# TFs"); plt.tight_layout(); plt.show()
 # %%
 res = pd.read_csv(Path.cwd().parent / "results" / "tables" / "results.csv")
 full = res[(res.condition == "full") & (res.task == "cell_type")].sort_values("mean")
-fig, ax = plt.subplots(figsize=(7, 3.6))
-ax.barh(full.model, full["mean"], xerr=full["std"], color="#3aa")
-ax.set_xlim(0, 1); ax.set_xlabel("macro-F1"); ax.set_title("full-data cell-type embedding quality")
-plt.tight_layout(); plt.show()
+fig = px.bar(full, x="mean", y="model", orientation="h", error_x="std", range_x=[0, 1],
+             title="full-data cell-type embedding quality", labels=dict(mean="macro-F1"),
+             color="mean", color_continuous_scale="Teal")
+fig.update_layout(height=380, width=720, coloraxis_showscale=False)
+fig
 
 # %% [markdown]
 # **Takeaway.** PCA and the unconstrained baseline beat every DoRothEA-masked variant, and the
