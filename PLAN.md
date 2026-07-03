@@ -141,8 +141,12 @@ data/            (gitignored cache)
   30,609 real edges (0.89% density). Controls at matched density: rewired 28,841 (degree-
   preserving target-permutation; ~6% dropped as dup collisions — note), sign_shuffled 30,609,
   random 30,486. Density ablations: A 5,664, AB 14,312. Baseline + all controls share this gene set.
-- **Step 4 — Encoders.** PCA + dense MLP autoencoder (baseline); graph-masked MLP autoencoder
-  (GRN). Shared objective = reconstruction (MSE on log-norm); matched capacity/budget; no labels.
+- **Step 4 — Encoders.** ✅ `models.py` + `data.py`. Shared AE (gene→hidden→z=64→…→gene); the
+  **only** structural difference is the first encoder layer: dense (baseline) vs `MaskedLinear`
+  (GRN: effective weight = mask·sign·softplus(raw), each hidden unit = a signed TF regulon).
+  Corrupted graphs feed the same class → controls at identical nominal params (6.95M; GRN's
+  *effective* free params = #edges). Objective = MSE reconstruction, no labels. Smoke test:
+  both train on MPS, finite 64-d embeddings; baseline recon val_mse 0.052 < GRN 0.056 (expected).
 - **Step 5 — Eval harness.** Frozen embedding → linear + kNN probes; grouped-by-donor CV;
   donor-predictability check; macro-F1 / accuracy, mean ± std over folds and seeds.
 - **Step 6 — Experiments.** Full-data · low-data (subsample donors) · noise · **graph corruption

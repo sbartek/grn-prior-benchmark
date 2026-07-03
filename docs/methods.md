@@ -28,8 +28,9 @@ attributable to the graph.
   mask = gene×TF adjacency. **8,376 genes × 411 TFs**, 30,609 real edges (0.89%). Controls at
   matched density: rewire 28,841 / sign-shuffle 30,609 / random 30,486; density ablations A/AB.
   All models share this gene set → any gain is graph structure, not feature selection.
-- **Step 4 — Encoders.** PCA + dense MLP autoencoder (baseline); graph-masked MLP autoencoder
-  (GRN). GNN optional stretch (avoids torch_geometric friction on Mac).
+- **Step 4 — Encoders.** ✅ Shared autoencoder; only the first encoder layer differs — dense
+  (baseline) vs masked+signed TF-regulon layer (GRN). Corrupted graphs → controls at identical
+  params. PCA = linear floor. Objective = MSE reconstruction, no labels. (GNN = optional stretch.)
 - **Step 5 — Eval harness.** Frozen embedding → linear + kNN probes; grouped-by-donor CV;
   donor-predictability check; macro-F1 / accuracy, mean ± std over folds and seeds.
 - **Step 6 — Experiments.** Full-data · low-data (subsample donors) · noise (count
