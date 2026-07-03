@@ -9,7 +9,17 @@ _What we tested and why "better" means biological state, not reconstruction._
 _RA PBMC dataset; predicting cell type (primary) and disease (suggestive). Why these labels._
 
 ## Is the dataset suitable?
-_Between-subjects RA/healthy → disease is confounded with donor. What this dataset can and cannot answer._
+Checked directly on the fetched data (108,717 cells × 61,497 genes, raw counts):
+
+- **Disease is balanced:** 18 rheumatoid-arthritis vs 18 normal donors (48,637 / 60,080 cells).
+- **No sex confound:** 12 female / 6 male donors in *both* arms.
+- **No assay confound:** a single assay (10x 3′ v3) across all cells — so disease cannot be
+  explained by chemistry/platform differences.
+- **15 immune cell types** present; some are rare (CD4 α-β T 595 cells, γδ-T 1,424).
+
+The design is **between-subjects**, so disease is inevitably confounded with **donor identity**:
+any RA-vs-normal signal could be donor idiosyncrasy. We therefore treat **cell type** as the
+trustworthy readout and report **disease** as suggestive only, always splitting by donor.
 
 ## Pseudobulk & graph construction
 _How donor×cell_type pseudobulk was built; gene alignment to DoRothEA; confidence filtering._

@@ -128,7 +128,10 @@ data/            (gitignored cache)
   scanpy 1.11.5, anndata 0.12.19, torch 2.12.1 (**MPS available**), decoupler 2.1.6
   (`dc.op.dorothea` present), cellxgene-census 1.18.0, scikit-learn 1.9.0. Pins in
   `requirements.txt`; exact freeze in `requirements.lock.txt`.
-- **Step 1 — Data.** Fetch CELLxGENE RA PBMC subset, cache `.h5ad` to `data/`.
+- **Step 1 — Data.** ✅ Fetched RA PBMC subset → `data/raw.h5ad` (108,717 cells × 61,497 genes,
+  302 MB, **raw integer counts**). Suitability confirmed: disease balanced (18 RA / 18 normal),
+  **no sex confound** (12F/6M in both arms), **single assay** (10x 3′ v3), 15 cell types present
+  (rare: CD4 595, γδ-T 1424 cells). Main confound = donor (between-subjects), as expected.
 - **Step 2 — Pseudobulk.** Aggregate (donor × cell_type), QC-filter small groups, normalize + log.
 - **Step 3 — Graph + controls.** DoRothEA adjacency on shared genes; rewire / sign-shuffle /
   random / confidence-filtered control graphs. Restrict pseudobulk to the shared gene set.
