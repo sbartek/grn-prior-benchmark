@@ -33,9 +33,18 @@ uv run python scripts/02_build_graph.py
 uv run python scripts/03_run_experiments.py
 ```
 
+## Notebook
+`notebooks/01_eda_suitability.ipynb` — narrative EDA + dataset-suitability check (composition,
+balance, library sizes, PCA/UMAP showing cell type separates but disease/donor don't, DoRothEA
+graph stats, headline result). Committed with outputs; re-run with:
+
+```bash
+uv run jupyter nbconvert --to notebook --execute --inplace notebooks/01_eda_suitability.ipynb
+```
+
 ## Layout
 `src/grn_bench/` core lib · `scripts/` pipeline · `notebooks/` EDA · `results/` figures+tables ·
-`memo/` write-up. Full design rationale in `PLAN.md`.
+`memo/` write-up. Full design rationale in `PLAN.md`; findings in `memo/memo.md`.
 
 ## Status
 Scaffold + plan. Implementation in progress — see `PLAN.md` §7 for the timeline.

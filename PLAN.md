@@ -155,7 +155,9 @@ data/            (gitignored cache)
   real 0.699); faint real>rewired signal under stress but never beats baseline; disease not
   decodable from held-out donors (donor confound); prior doesn't reduce donor leakage.
 - **Step 7 — Suitability.** Report donor≈disease confound; lean on cell type as trustworthy readout.
-- **Step 8 — Write-up.** Ablation table + 3–4 figures → ~2-page memo. Reserve last ~4h.
+- **Step 8 — Write-up.** ✅ Memo (`memo/memo.md`) + 4 figures + **executed EDA notebook**
+  (`notebooks/01_eda_suitability.ipynb`: composition/balance, PCA+UMAP confound visual, graph
+  stats, headline). Ablation table = `results/tables/results.csv`.
 - **Step 9 — Package + submit.** README one-command reproduce; push; email repo link to Caelan.
 
 **Critical path if short on time:** -1 → 0 → 1 → 2 → 3 → 4 → 5 → (Step 6 corruption test only) → 8.
