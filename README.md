@@ -43,6 +43,10 @@ re-run with (needs `plotly`, `umap-learn`, `jupyterlab` in the env):
 uv run jupyter nbconvert --to notebook --execute --inplace notebooks/01_eda_suitability.ipynb
 ```
 
+For reviewing without running, open the self-contained
+[`notebooks/01_eda_suitability.html`](notebooks/01_eda_suitability.html) (Plotly.js embedded,
+renders offline in any browser).
+
 ## Layout
 `src/grn_bench/` core lib · `scripts/` pipeline · `notebooks/` EDA · `results/` figures+tables ·
 `memo/` write-up. Full design rationale in `PLAN.md`; findings in `memo/memo.md`.

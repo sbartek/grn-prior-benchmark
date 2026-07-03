@@ -29,6 +29,7 @@ import plotly.express as px
 import plotly.io as pio
 
 pio.templates.default = "plotly_white"
+pio.renderers.default = "notebook"   # embed plotly.js -> figures render in Lab, GitHub, and HTML export
 
 sys.path.insert(0, str(Path.cwd().parent / "src"))
 from grn_bench.data import load_aligned  # noqa: E402
