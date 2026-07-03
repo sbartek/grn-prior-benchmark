@@ -22,8 +22,8 @@ attributable to the graph.
   wheels). Verified: scanpy 1.11.5, torch 2.12.1 (MPS/Apple-GPU available), decoupler 2.1.6,
   cellxgene-census 1.18.0. Exact pins in `requirements.lock.txt`.
 - **Step 1 — Data.** Fetch CELLxGENE RA PBMC subset (`d18736c3-…`), cache `.h5ad` to `data/`.
-- **Step 2 — Pseudobulk.** Aggregate (donor × cell_type), drop small groups (<~10 cells),
-  normalize + log-transform.
+- **Step 2 — Pseudobulk.** ✅ Sum raw counts per (donor × cell_type), drop groups < 10 cells
+  (536 → 500 kept, median 104 cells/group), CP10K + log1p → **500 samples × 21,572 genes**.
 - **Step 3 — Graph + controls.** DoRothEA via `decoupler`; adjacency on shared genes; build
   controls: degree-preserving **rewire**, **sign-shuffle**, **random**, confidence A/AB/ABC.
   Restrict pseudobulk to the shared gene set (baseline and GRN see identical features).

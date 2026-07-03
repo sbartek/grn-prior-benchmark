@@ -132,7 +132,10 @@ data/            (gitignored cache)
   302 MB, **raw integer counts**). Suitability confirmed: disease balanced (18 RA / 18 normal),
   **no sex confound** (12F/6M in both arms), **single assay** (10x 3′ v3), 15 cell types present
   (rare: CD4 595, γδ-T 1424 cells). Main confound = donor (between-subjects), as expected.
-- **Step 2 — Pseudobulk.** Aggregate (donor × cell_type), QC-filter small groups, normalize + log.
+- **Step 2 — Pseudobulk.** ✅ Summed raw counts per (donor × cell_type) via a sparse indicator
+  matmul → `data/pseudobulk.h5ad`: **500 samples × 21,572 genes** (536 groups → 500 kept at
+  ≥10 cells; median 104 cells/group). Raw counts kept in `layers["counts"]`; X = CP10K + log1p.
+  Gene symbols stored in `var["gene_symbol"]` for DoRothEA matching.
 - **Step 3 — Graph + controls.** DoRothEA adjacency on shared genes; rewire / sign-shuffle /
   random / confidence-filtered control graphs. Restrict pseudobulk to the shared gene set.
 - **Step 4 — Encoders.** PCA + dense MLP autoencoder (baseline); graph-masked MLP autoencoder

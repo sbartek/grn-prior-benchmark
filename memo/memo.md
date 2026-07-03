@@ -22,7 +22,11 @@ any RA-vs-normal signal could be donor idiosyncrasy. We therefore treat **cell t
 trustworthy readout and report **disease** as suggestive only, always splitting by donor.
 
 ## Pseudobulk & graph construction
-_How donor×cell_type pseudobulk was built; gene alignment to DoRothEA; confidence filtering._
+**Pseudobulk:** summed raw counts within each (donor × cell_type) group, dropped groups < 10
+cells (536 possible → **500 kept**, median 104 cells/group), then CP10K + log1p. Result:
+**500 samples × 21,572 expressed genes**, spanning 36 donors × 15 cell types. Summation (not
+mean) keeps the aggregation statistically principled; raw counts retained for the noise
+experiments. _(Graph alignment + confidence filtering: Step 3, to fill.)_
 
 ## What we compared
 _Baseline (PCA / capacity-matched MLP AE) vs GRN-aware (masked-MLP restricted to TF–target edges);
