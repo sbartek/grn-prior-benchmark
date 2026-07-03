@@ -26,7 +26,15 @@ trustworthy readout and report **disease** as suggestive only, always splitting 
 cells (536 possible → **500 kept**, median 104 cells/group), then CP10K + log1p. Result:
 **500 samples × 21,572 expressed genes**, spanning 36 donors × 15 cell types. Summation (not
 mean) keeps the aggregation statistically principled; raw counts retained for the noise
-experiments. _(Graph alignment + confidence filtering: Step 3, to fill.)_
+experiments.
+
+**Graph:** DoRothEA (A+B+C) filtered to measured genes. Each **hidden unit = a TF**, connected
+only to its target genes (+ the TF's own gene as a self-loop); the encoder's input→hidden mask
+*is* the gene×TF adjacency. Result: **8,376 input genes × 411 TF units, 30,609 edges** (0.89%
+density). Controls share the exact same gene set and (where noted) edge count: degree-preserving
+**rewire** (28,841 edges), **sign-shuffle** (30,609), **random** Erdős–Rényi (30,486); plus
+density ablations at confidence A (5,664) and A+B (14,312). Because baseline and controls see the
+identical gene set, any advantage is attributable to graph *structure*, not feature selection.
 
 ## What we compared
 _Baseline (PCA / capacity-matched MLP AE) vs GRN-aware (masked-MLP restricted to TF–target edges);

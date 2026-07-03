@@ -24,9 +24,10 @@ attributable to the graph.
 - **Step 1 — Data.** Fetch CELLxGENE RA PBMC subset (`d18736c3-…`), cache `.h5ad` to `data/`.
 - **Step 2 — Pseudobulk.** ✅ Sum raw counts per (donor × cell_type), drop groups < 10 cells
   (536 → 500 kept, median 104 cells/group), CP10K + log1p → **500 samples × 21,572 genes**.
-- **Step 3 — Graph + controls.** DoRothEA via `decoupler`; adjacency on shared genes; build
-  controls: degree-preserving **rewire**, **sign-shuffle**, **random**, confidence A/AB/ABC.
-  Restrict pseudobulk to the shared gene set (baseline and GRN see identical features).
+- **Step 3 — Graph + controls.** ✅ Hidden unit = TF aggregating its regulon (+ self-loop) →
+  mask = gene×TF adjacency. **8,376 genes × 411 TFs**, 30,609 real edges (0.89%). Controls at
+  matched density: rewire 28,841 / sign-shuffle 30,609 / random 30,486; density ablations A/AB.
+  All models share this gene set → any gain is graph structure, not feature selection.
 - **Step 4 — Encoders.** PCA + dense MLP autoencoder (baseline); graph-masked MLP autoencoder
   (GRN). GNN optional stretch (avoids torch_geometric friction on Mac).
 - **Step 5 — Eval harness.** Frozen embedding → linear + kNN probes; grouped-by-donor CV;

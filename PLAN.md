@@ -136,8 +136,11 @@ data/            (gitignored cache)
   matmul → `data/pseudobulk.h5ad`: **500 samples × 21,572 genes** (536 groups → 500 kept at
   ≥10 cells; median 104 cells/group). Raw counts kept in `layers["counts"]`; X = CP10K + log1p.
   Gene symbols stored in `var["gene_symbol"]` for DoRothEA matching.
-- **Step 3 — Graph + controls.** DoRothEA adjacency on shared genes; rewire / sign-shuffle /
-  random / confidence-filtered control graphs. Restrict pseudobulk to the shared gene set.
+- **Step 3 — Graph + controls.** ✅ `data/graph.npz`. Each hidden unit = a TF aggregating its
+  regulon (+ self-loop) → mask is the gene×TF adjacency. **8,376 input genes × 411 TFs**,
+  30,609 real edges (0.89% density). Controls at matched density: rewired 28,841 (degree-
+  preserving target-permutation; ~6% dropped as dup collisions — note), sign_shuffled 30,609,
+  random 30,486. Density ablations: A 5,664, AB 14,312. Baseline + all controls share this gene set.
 - **Step 4 — Encoders.** PCA + dense MLP autoencoder (baseline); graph-masked MLP autoencoder
   (GRN). Shared objective = reconstruction (MSE on log-norm); matched capacity/budget; no labels.
 - **Step 5 — Eval harness.** Frozen embedding → linear + kNN probes; grouped-by-donor CV;
