@@ -147,10 +147,13 @@ data/            (gitignored cache)
   Corrupted graphs feed the same class → controls at identical nominal params (6.95M; GRN's
   *effective* free params = #edges). Objective = MSE reconstruction, no labels. Smoke test:
   both train on MPS, finite 64-d embeddings; baseline recon val_mse 0.052 < GRN 0.056 (expected).
-- **Step 5 — Eval harness.** Frozen embedding → linear + kNN probes; grouped-by-donor CV;
-  donor-predictability check; macro-F1 / accuracy, mean ± std over folds and seeds.
-- **Step 6 — Experiments.** Full-data · low-data (subsample donors) · noise · **graph corruption
-  (decisive: real vs rewired)**.
+- **Step 5 — Eval harness.** ✅ `eval.py` (donor-grouped probes, donor-leakage) + `experiments.py`
+  (nested donor-CV: encoder retrained per fold on train donors, then frozen probe).
+- **Step 6 — Experiments.** ✅ `03_run_experiments.py` → `results/tables/*.csv`, figures via
+  `04_make_figures.py`. **NEGATIVE result:** GRN prior trails PCA + baseline on cell type at full/
+  low-data/noise; real graph does NOT beat same-density controls at full data (random 0.731 >
+  real 0.699); faint real>rewired signal under stress but never beats baseline; disease not
+  decodable from held-out donors (donor confound); prior doesn't reduce donor leakage.
 - **Step 7 — Suitability.** Report donor≈disease confound; lean on cell type as trustworthy readout.
 - **Step 8 — Write-up.** Ablation table + 3–4 figures → ~2-page memo. Reserve last ~4h.
 - **Step 9 — Package + submit.** README one-command reproduce; push; email repo link to Caelan.

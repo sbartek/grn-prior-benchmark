@@ -1,0 +1,55 @@
+[data] (500, 8376)  device=mps
+[full]
+  pca              full       cell_type  F1=0.868±0.004
+  baseline         full       cell_type  F1=0.791±0.010
+  grn_real         full       cell_type  F1=0.699±0.014
+  grn_rewired      full       cell_type  F1=0.650±0.021
+  grn_sign_shuffled full       cell_type  F1=0.699±0.005
+  grn_random       full       cell_type  F1=0.731±0.007
+  pca              full       disease    F1=0.425±0.001
+  baseline         full       disease    F1=0.492±0.007
+  grn_real         full       disease    F1=0.484±0.041
+  grn_rewired      full       disease    F1=0.446±0.033
+  grn_sign_shuffled full       disease    F1=0.488±0.004
+  grn_random       full       disease    F1=0.451±0.031
+[lowdata]
+  baseline         lowdata:4  cell_type  F1=0.540±0.020
+  grn_real         lowdata:4  cell_type  F1=0.485±0.011
+  grn_rewired      lowdata:4  cell_type  F1=0.457±0.008
+  baseline         lowdata:8  cell_type  F1=0.648±0.028
+  grn_real         lowdata:8  cell_type  F1=0.553±0.027
+  grn_rewired      lowdata:8  cell_type  F1=0.525±0.020
+  baseline         lowdata:16 cell_type  F1=0.727±0.018
+  grn_real         lowdata:16 cell_type  F1=0.653±0.017
+  grn_rewired      lowdata:16 cell_type  F1=0.599±0.027
+  baseline         lowdata:4  disease    F1=0.465±0.013
+  grn_real         lowdata:4  disease    F1=0.449±0.011
+  grn_rewired      lowdata:4  disease    F1=0.448±0.011
+  baseline         lowdata:8  disease    F1=0.436±0.037
+  grn_real         lowdata:8  disease    F1=0.434±0.035
+  grn_rewired      lowdata:8  disease    F1=0.417±0.018
+  baseline         lowdata:16 disease    F1=0.422±0.000
+  grn_real         lowdata:16 disease    F1=0.472±0.037
+  grn_rewired      lowdata:16 disease    F1=0.443±0.025
+[noise]
+  baseline         noise:0.3  cell_type  F1=0.743±0.002
+  grn_real         noise:0.3  cell_type  F1=0.609±0.008
+  grn_rewired      noise:0.3  cell_type  F1=0.545±0.012
+  baseline         noise:0.1  cell_type  F1=0.661±0.021
+  grn_real         noise:0.1  cell_type  F1=0.509±0.034
+  grn_rewired      noise:0.1  cell_type  F1=0.448±0.021
+  baseline         noise:0.3  disease    F1=0.479±0.017
+  grn_real         noise:0.3  disease    F1=0.487±0.001
+  grn_rewired      noise:0.3  disease    F1=0.455±0.046
+  baseline         noise:0.1  disease    F1=0.482±0.010
+  grn_real         noise:0.1  disease    F1=0.475±0.005
+  grn_rewired      noise:0.1  disease    F1=0.462±0.008
+[write] /Users/barteks/workai/projects/grn-prior-benchmark/results/tables/results.csv  (42 rows)
+[donor-leakage]
+  pca              donor_acc=0.166
+  baseline         donor_acc=0.086
+  grn_real         donor_acc=0.114
+  grn_rewired      donor_acc=0.136
+  grn_sign_shuffled donor_acc=0.132
+  grn_random       donor_acc=0.098
+[done]

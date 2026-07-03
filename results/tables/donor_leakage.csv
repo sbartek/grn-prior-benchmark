@@ -1,0 +1,7 @@
+model,donor_acc
+pca,0.166
+baseline,0.08600000000000001
+grn_real,0.11400000000000002
+grn_rewired,0.136
+grn_sign_shuffled,0.132
+grn_random,0.098

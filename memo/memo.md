@@ -1,56 +1,100 @@
 # Technical Memo — GRN-Prior Expression Embedding Benchmark
 
-*(~2 pages. Draft skeleton — fill as experiments complete. Keep claims scoped to evidence.)*
+**Question.** Does a graph-aware encoder using DoRothEA TF→target edges produce *better*
+pseudobulk expression embeddings than a matched non-graph baseline — where "better" means the
+embedding captures biological state (cell type, disease), not that it reconstructs expression —
+and does any benefit hold up under low-data, noise, and graph corruption?
 
-## Question & framing
-_What we tested and why "better" means biological state, not reconstruction._
+**Answer (short).** No, not on this dataset. On the trustworthy readout (cell type) the DoRothEA
+prior *underperforms* both PCA and an unconstrained autoencoder at full data, under low data, and
+under noise. A faint structural signal exists — the real graph consistently beats a
+degree-preserving rewired graph — but it is small, never beats the baseline, and is not
+corroborated by the random-graph control. Disease is not decodable from held-out donors, so it
+cannot adjudicate the question. This is a fair negative result.
 
-## Data & task chosen
-_RA PBMC dataset; predicting cell type (primary) and disease (suggestive). Why these labels._
+## Data & task
+CELLxGENE RA PBMC (`d18736c3…`): 108,717 cells → **pseudobulk by (donor × cell_type)**, 536
+groups → **500 kept** (≥10 cells), CP10K+log1p, 21,572 genes. Two readouts: **cell type**
+(15 classes, primary) and **disease** (RA vs normal, secondary). All scoring uses **donor-grouped
+5-fold CV** with the encoder retrained on train donors inside each fold — so neither encoder nor
+probe ever sees a held-out donor. Metric: macro-F1, mean over 2 seeds.
 
 ## Is the dataset suitable?
-Checked directly on the fetched data (108,717 cells × 61,497 genes, raw counts):
+Confirmed on data: **balanced 18 RA / 18 normal**, **no sex confound** (12F/6M in both arms),
+**single assay** (10x 3′ v3, so no assay–disease confound), 15 cell types (some rare). The design
+is **between-subjects**, so disease is confounded with **donor identity**. Consequence: cell type
+is the trustworthy readout; **disease is reported as suggestive only**.
 
-- **Disease is balanced:** 18 rheumatoid-arthritis vs 18 normal donors (48,637 / 60,080 cells).
-- **No sex confound:** 12 female / 6 male donors in *both* arms.
-- **No assay confound:** a single assay (10x 3′ v3) across all cells — so disease cannot be
-  explained by chemistry/platform differences.
-- **15 immune cell types** present; some are rare (CD4 α-β T 595 cells, γδ-T 1,424).
+## What was compared
+Shared autoencoder (gene → hidden(411) → z=64 → … → gene), MSE reconstruction, **no labels**. The
+*only* structural difference is the first encoder layer:
+- **baseline** — dense; **PCA** — linear floor.
+- **grn_real** — masked so each hidden unit is a TF aggregating its regulon (effective weight =
+  mask·sign·softplus(raw)); 8,376 genes × 411 TFs, 30,609 edges.
+- **graph controls at matched density** — degree-preserving **rewired**, **sign-shuffled**,
+  **random**. All share the identical gene set, so any difference is graph *structure*, not
+  feature selection. Real-vs-controls is capacity-matched exactly (same #params, same #edges).
 
-The design is **between-subjects**, so disease is inevitably confounded with **donor identity**:
-any RA-vs-normal signal could be donor idiosyncrasy. We therefore treat **cell type** as the
-trustworthy readout and report **disease** as suggestive only, always splitting by donor.
+## Results
 
-## Pseudobulk & graph construction
-**Pseudobulk:** summed raw counts within each (donor × cell_type) group, dropped groups < 10
-cells (536 possible → **500 kept**, median 104 cells/group), then CP10K + log1p. Result:
-**500 samples × 21,572 expressed genes**, spanning 36 donors × 15 cell types. Summation (not
-mean) keeps the aggregation statistically principled; raw counts retained for the noise
-experiments.
+**Cell type (macro-F1).** The prior hurts, everywhere:
 
-**Graph:** DoRothEA (A+B+C) filtered to measured genes. Each **hidden unit = a TF**, connected
-only to its target genes (+ the TF's own gene as a self-loop); the encoder's input→hidden mask
-*is* the gene×TF adjacency. Result: **8,376 input genes × 411 TF units, 30,609 edges** (0.89%
-density). Controls share the exact same gene set and (where noted) edge count: degree-preserving
-**rewire** (28,841 edges), **sign-shuffle** (30,609), **random** Erdős–Rényi (30,486); plus
-density ablations at confidence A (5,664) and A+B (14,312). Because baseline and controls see the
-identical gene set, any advantage is attributable to graph *structure*, not feature selection.
+| condition | PCA | baseline | grn_real | grn_rewired | grn_sign_shuf | grn_random |
+|---|---|---|---|---|---|---|
+| full | **0.868** | 0.791 | 0.699 | 0.650 | 0.699 | 0.731 |
+| lowdata k=4 | – | **0.540** | 0.485 | 0.457 | – | – |
+| lowdata k=8 | – | **0.648** | 0.553 | 0.525 | – | – |
+| lowdata k=16 | – | **0.727** | 0.653 | 0.599 | – | – |
+| noise p=0.3 | – | **0.743** | 0.609 | 0.545 | – | – |
+| noise p=0.1 | – | **0.661** | 0.509 | 0.448 | – | – |
 
-## What we compared
-_Baseline (PCA / capacity-matched MLP AE) vs GRN-aware (masked-MLP restricted to TF–target edges);
-matched gene set, capacity, training budget._
+**Disease (macro-F1).** Everything sits at ~0.42–0.49 (≈ chance for this binary task); no model
+decodes disease from held-out donors. The donor confound dominates, as predicted. Not adjudicative.
 
-## Did the GRN help — and where?
-_Full-data vs low-data vs noise. Curves, not single numbers._
+**Donor leakage** (kNN donor accuracy, lower = less leakage): baseline 0.086, random 0.098,
+grn_real 0.114, sign_shuf 0.132, rewired 0.136, PCA 0.166. The prior does **not** reduce
+donor/batch signal; the baseline leaks least.
 
-## Graph controls (the decisive test)
-_Real graph vs degree-preserving rewire vs sign-shuffle vs random. Is the benefit biology or sparsity?_
+## Interpretation — did the GRN help, and where?
+1. **No, on the primary readout.** grn_real trails baseline and PCA at every condition. The
+   inductive bias costs more (each hidden unit sees only its regulon) than the biology it adds.
+2. **The decisive corruption test is negative at full data.** grn_real (0.699) does **not** beat
+   its same-density controls: sign-shuffled ties it (0.699) and **random is higher (0.731)**. So
+   the *specific* DoRothEA biology adds nothing over a random graph of the same density — what
+   little the mask does is explained by sparsity, not regulatory content.
+3. **A faint, honestly-reported structural signal.** Under low-data and noise, grn_real is
+   consistently above grn_rewired (e.g. k=16: 0.653 vs 0.599; p=0.3: 0.609 vs 0.545). So the real
+   topology beats a degree-matched shuffle — some biologically-relevant structure survives — but
+   it is small, never reaches the baseline, and is contradicted by the full-data random control.
+   We scope the claim to exactly that: weak evidence of structure, insufficient to be useful.
+4. **Biology vs batch.** Cell type (a strong, largely linear signal — PCA tops the table) is
+   captured best by the *least* constrained methods; disease (confounded) by none. The prior buys
+   neither better biology nor lower donor leakage.
 
-## Biology vs batch/donor
-_Donor-predictability of embeddings; batch mixing. Does the model learn state or donor identity?_
+## Why the prior likely didn't help here
+- Cell-type identity in PBMC is high-variance and near-linear; PCA already nails it, leaving no
+  gap for a regulatory inductive bias to fill.
+- Pseudobulk averaging already removes most technical noise, shrinking the regularization
+  advantage a prior might offer on raw single cells.
+- A **hard mask + fixed sign** is a rigid encoding of the prior: it discards capacity and forces
+  activation/repression directions that may be noisy in DoRothEA (esp. C-confidence edges). A
+  *soft* prior (graph-Laplacian penalty, graph init, or GNN message passing) might behave better
+  and is untested here.
 
 ## Limitations
-_Small N, one dataset, donor confound, no hyperparameter search, pseudobulk aggregation choices._
+Single dataset; n=500 pseudobulk; disease confounded with donor; 2 seeds; no hyperparameter
+search; one prior-encoding (hard mask) of many; probes limited to logistic/kNN; density ablations
+(A/AB) built but not swept in the main run.
 
-## What would make this biologically stronger
-_Within-subjects perturbation design; more datasets; matched assays; richer biological readouts._
+## What would make the experiment biologically stronger
+- A readout that is genuinely *regulatory* (predict perturbation response or measured TF activity)
+  rather than cell-type identity, which linear methods already solve.
+- **Within-subjects** perturbation data, so biological state is not aliased with donor.
+- Multiple datasets + assays for external validity; sweep DoRothEA confidence/density; test a
+  **soft** graph prior (Laplacian reg / GNN) as an alternative to the hard mask.
+
+## What I deliberately left out (48h scope)
+Raw single-cell modeling; STATE/metabolic/pathway priors (out of scope); GNN (masked-MLP was the
+primary, pure-torch choice); hyperparameter search; backup datasets; the A/AB density sweep. I
+prioritized a *fair, capacity-matched* baseline-vs-prior-vs-corruption comparison on one readout
+over broad but shallow coverage.
