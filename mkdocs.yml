@@ -1,0 +1,25 @@
+site_name: GRN-Prior Expression Embedding Benchmark
+site_description: Does a DoRothEA GRN prior improve pseudobulk expression embeddings vs a matched non-graph baseline?
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: teal
+      accent: teal
+  features:
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - toc.integrate
+markdown_extensions:
+  - admonition
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.superfences
+  - pymdownx.highlight
+nav:
+  - Overview: index.md
+  - Concepts (biology primer): concepts.md
+  - Methods & steps: methods.md
+  - Results: results.md

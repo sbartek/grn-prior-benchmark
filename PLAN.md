@@ -112,7 +112,48 @@ scikit-learn (probes/PCA) · torch (encoders) · matplotlib. torch_geometric opt
 src/grn_bench/   data.py · pseudobulk.py · graph.py · models.py · eval.py · experiments.py
 scripts/         00_fetch_data.py · 01_build_pseudobulk.py · 02_build_graph.py · 03_run_experiments.py
 notebooks/       01_eda_suitability.ipynb
+docs/            index.md · concepts.md · methods.md · results.md  (MkDocs Material → GitHub Pages)
 results/         figures/ · tables/
 memo/            memo.md (→ 2-page PDF)
 data/            (gitignored cache)
 ```
+
+## 11. Execution steps
+
+- **Step -1 — Repo + documentation.** Private GitHub repo `sbartek/grn-prior-benchmark`
+  (SSH remote). Human-readable docs as **MkDocs Material** in `docs/`, deployed to **GitHub
+  Pages** via `.github/workflows/docs.yml`. All docs are plain markdown so they also render
+  natively on github.com (fallback if Pages is unavailable on a private repo — see below).
+- **Step 0 — Environment.** `uv venv --python 3.11`; install deps.
+- **Step 1 — Data.** Fetch CELLxGENE RA PBMC subset, cache `.h5ad` to `data/`.
+- **Step 2 — Pseudobulk.** Aggregate (donor × cell_type), QC-filter small groups, normalize + log.
+- **Step 3 — Graph + controls.** DoRothEA adjacency on shared genes; rewire / sign-shuffle /
+  random / confidence-filtered control graphs. Restrict pseudobulk to the shared gene set.
+- **Step 4 — Encoders.** PCA + dense MLP autoencoder (baseline); graph-masked MLP autoencoder
+  (GRN). Shared objective = reconstruction (MSE on log-norm); matched capacity/budget; no labels.
+- **Step 5 — Eval harness.** Frozen embedding → linear + kNN probes; grouped-by-donor CV;
+  donor-predictability check; macro-F1 / accuracy, mean ± std over folds and seeds.
+- **Step 6 — Experiments.** Full-data · low-data (subsample donors) · noise · **graph corruption
+  (decisive: real vs rewired)**.
+- **Step 7 — Suitability.** Report donor≈disease confound; lean on cell type as trustworthy readout.
+- **Step 8 — Write-up.** Ablation table + 3–4 figures → ~2-page memo. Reserve last ~4h.
+- **Step 9 — Package + submit.** README one-command reproduce; push; email repo link to Caelan.
+
+**Critical path if short on time:** -1 → 0 → 1 → 2 → 3 → 4 → 5 → (Step 6 corruption test only) → 8.
+
+### GitHub Pages on a private repo — caveat
+Publishing Pages from a **private** repo needs GitHub Pro/Team (free plan only serves Pages
+from public repos). Fallback order: (1) browse docs as markdown on github.com — renders fine,
+zero infra; (2) `mkdocs serve` locally for the live site; (3) flip the repo public *after* the
+submission deadline to publish the Pages site. The Actions workflow is wired so Pages "just
+works" the moment it's enabled/eligible.
+
+## 12. Living-documentation protocol (update after EVERY step)
+
+After completing each execution step above, before moving on:
+1. **PLAN.md** — tick the step / note what actually happened, deviations, new decisions.
+2. **Docs** — update the relevant `docs/*.md` (methods/results/concepts) + `memo/memo.md`.
+3. **Memory** — update `project_grn_benchmark.md` with durable status/decisions.
+4. **Commit** — one focused commit per step (`Step N: …`), push to the remote.
+
+Definition of done for a step = code works **and** all four of the above are updated.

@@ -15,3 +15,6 @@ results/**/*.parquet
 
 # os
 .DS_Store
+
+# mkdocs build output
+site/
