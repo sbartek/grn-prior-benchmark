@@ -154,6 +154,8 @@ data/            (gitignored cache)
   low-data/noise; real graph does NOT beat same-density controls at full data (random 0.731 >
   real 0.699); faint real>rewired signal under stress but never beats baseline; disease not
   decodable from held-out donors (donor confound); prior doesn't reduce donor leakage.
+  **Density ablation** (`05_density_ablation.py`): high-confidence A-subset ≈ baseline, but
+  rewired-A matches/beats it under low-data → gain is sparsity/regularization, not biology.
 - **Step 7 — Suitability.** Report donor≈disease confound; lean on cell type as trustworthy readout.
 - **Step 8 — Write-up.** ✅ Memo (`memo/memo.md`) + 4 figures + **executed EDA notebook**
   (`notebooks/01_eda_suitability.ipynb`: composition/balance, PCA+UMAP confound visual, graph

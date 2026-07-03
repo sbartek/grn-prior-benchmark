@@ -59,9 +59,17 @@ def main() -> None:
 
     variants = {}
     real = pd.concat([dor, self_edges], ignore_index=True)
+    dor_A = dor[dor.confidence == "A"]
+    dor_AB = dor[dor.confidence.isin(["A", "B"])]
     variants["real"] = real
-    variants["real_A"] = pd.concat([dor[dor.confidence == "A"], self_edges], ignore_index=True)
-    variants["real_AB"] = pd.concat([dor[dor.confidence.isin(["A", "B"])], self_edges], ignore_index=True)
+    variants["real_A"] = pd.concat([dor_A, self_edges], ignore_index=True)
+    variants["real_AB"] = pd.concat([dor_AB, self_edges], ignore_index=True)
+
+    # degree-preserving rewire controls for the confidence subsets (biology-vs-sparsity at A/AB)
+    for name, sub in [("rewired_A", dor_A), ("rewired_AB", dor_AB)]:
+        rw = sub.copy()
+        rw["target"] = rng.permutation(sub["target"].to_numpy())
+        variants[name] = pd.concat([rw, self_edges], ignore_index=True)
 
     # controls derived from the full real topology (dor edges only; self-loops re-added)
     rewired = dor.copy()

@@ -9,6 +9,7 @@ Figures:
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -55,9 +56,29 @@ def bar_leakage():
     fig.tight_layout(); fig.savefig(FIG / "fig_leakage.png", dpi=130); plt.close(fig)
 
 
+def bar_density():
+    p = TAB / "density.csv"
+    if not p.exists():
+        return
+    dd = pd.read_csv(p)
+    conds = ["full", "lowdata:8", "noise:0.3"]
+    order = ["baseline", "grn_real_A", "grn_rewired_A", "grn_real_AB", "grn_real"]
+    fig, ax = plt.subplots(figsize=(10, 4.2))
+    w = 0.16
+    for j, m in enumerate(order):
+        s = dd[dd.model == m].set_index("condition").reindex(conds)
+        ax.bar(np.arange(len(conds)) + j * w, s["mean"], w, yerr=s["std"], label=m, capsize=2)
+    ax.set_xticks(np.arange(len(conds)) + 2 * w); ax.set_xticklabels(conds)
+    ax.set_ylabel("cell-type macro-F1"); ax.set_ylim(0, 0.9)
+    ax.set_title("density ablation: real vs rewired at each confidence level")
+    ax.legend(fontsize=8, ncol=2)
+    fig.tight_layout(); fig.savefig(FIG / "fig_density.png", dpi=130); plt.close(fig)
+
+
 if __name__ == "__main__":
     bar_full()
     line_condition("lowdata:", "# train donors", "fig_lowdata.png", int)
     line_condition("noise:", "counts kept (thinning p)", "fig_noise.png", float)
     bar_leakage()
-    print("[figures] wrote fig_full, fig_lowdata, fig_noise, fig_leakage to results/figures/")
+    bar_density()
+    print("[figures] wrote fig_full, fig_lowdata, fig_noise, fig_leakage, fig_density")

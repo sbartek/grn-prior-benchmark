@@ -11,11 +11,12 @@ between-subjects → disease is confounded with donor. Consequence: **cell type*
 readout, **disease** = suggestive only, always splitting by donor.
 
 ## Headline
-**The DoRothEA prior did not improve embeddings.** On cell type it trails both PCA and the
-unconstrained baseline at full data, low data, and under noise. A faint signal exists (real graph
-> degree-preserving rewire under stress) but it never beats the baseline and is contradicted by
-the random-graph control at full data. Disease is not decodable from held-out donors. A fair
-**negative result**.
+**The DoRothEA prior did not usefully improve embeddings — and where it seems to, density (not
+biology) is the cause.** The full ABC graph trails PCA and the baseline everywhere; a
+high-confidence A-subset closes the gap, but rewired-A controls show that is a
+sparsity/regularization effect, not regulatory structure. The specific topology adds only a small
+margin over its rewired control (full data, noise) and never beats the baseline. Disease is not
+decodable from held-out donors. A fair, mostly **negative result**, carefully scoped.
 
 ## Full-data comparison
 ![full](img/fig_full.png)
@@ -36,6 +37,15 @@ Same ordering under count-thinning (p=0.3, 0.1). The prior does not improve nois
 At full data grn_real (0.699) ties sign-shuffled (0.699) and is **below random** (0.731). Under
 low-data/noise grn_real > grn_rewired but the gap is small and never reaches baseline. Verdict:
 the *specific* DoRothEA biology adds little beyond graph density.
+
+## Density ablation (confidence A / AB / ABC, with rewired controls)
+![density](img/fig_density.png)
+Sparser high-confidence graphs beat the dense full graph (real_A 0.788 ≈ baseline 0.791 ≫ real
+0.699). But **rewired_A** matches real_A — and *beats* it under low data (0.686 vs 0.671) — so the
+improvement is mostly **sparsity/regularization, not biology**. The true topology adds only a
+small margin over its rewired control at full data and under noise. Bottom line: what looks like
+"the prior helps" is largely a density effect; the specific regulatory structure is a minor lever
+and never beats the baseline.
 
 ## Biology vs batch/donor
 ![leakage](img/fig_leakage.png)

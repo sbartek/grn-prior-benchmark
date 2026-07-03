@@ -5,12 +5,15 @@ pseudobulk expression embeddings than a matched non-graph baseline — where "be
 embedding captures biological state (cell type, disease), not that it reconstructs expression —
 and does any benefit hold up under low-data, noise, and graph corruption?
 
-**Answer (short).** No, not on this dataset. On the trustworthy readout (cell type) the DoRothEA
-prior *underperforms* both PCA and an unconstrained autoencoder at full data, under low data, and
-under noise. A faint structural signal exists — the real graph consistently beats a
-degree-preserving rewired graph — but it is small, never beats the baseline, and is not
-corroborated by the random-graph control. Disease is not decodable from held-out donors, so it
-cannot adjudicate the question. This is a fair negative result.
+**Answer (short).** Largely no, with an instructive nuance. On the trustworthy readout (cell
+type) the *full* DoRothEA prior (A+B+C) underperforms both PCA and an unconstrained autoencoder
+everywhere. Restricting to high-confidence edges (confidence **A**) removes almost all of that gap
+— but a **density ablation with degree-preserving rewired controls shows this is mostly a sparsity
+/ regularization effect, not regulatory biology**: a rewired A-graph does as well or better under
+low data. The *specific* topology contributes only a small, consistent lift over its rewired
+control at full data and under noise (~0.02–0.05 F1), and it never beats the plain baseline.
+Disease is not decodable from held-out donors, so it cannot adjudicate. Net: a fair, mostly
+negative result where what *looks* like "the prior helps" is explained by density, not biology.
 
 ## Data & task
 CELLxGENE RA PBMC (`d18736c3…`): 108,717 cells → **pseudobulk by (donor × cell_type)**, 536
@@ -55,6 +58,19 @@ decodes disease from held-out donors. The donor confound dominates, as predicted
 grn_real 0.114, sign_shuf 0.132, rewired 0.136, PCA 0.166. The prior does **not** reduce
 donor/batch signal; the baseline leaks least.
 
+**Density ablation (confidence A / A+B / A+B+C, with rewired controls; cell type macro-F1).**
+
+| condition | baseline | real_A | rewired_A | real_AB | real (ABC) |
+|---|---|---|---|---|---|
+| full | 0.791 | 0.788 | 0.767 | 0.745 | 0.699 |
+| lowdata k=8 | 0.648 | 0.671 | **0.686** | 0.586 | 0.553 |
+| noise p=0.3 | 0.743 | 0.705 | 0.655 | 0.638 | 0.609 |
+
+Sparser, higher-confidence graphs are *better* (real_A ≫ real). But real_A vs rewired_A is the
+tell: under low data the **rewired** A-graph is best (0.686 > 0.671), so that regime's gains are
+sparsity, not biology; only at full data (0.788 vs 0.767) and under noise (0.705 vs 0.655) does
+the true topology add a small margin over its rewired control.
+
 ## Interpretation — did the GRN help, and where?
 1. **No, on the primary readout.** grn_real trails baseline and PCA at every condition. The
    inductive bias costs more (each hidden unit sees only its regulon) than the biology it adds.
@@ -62,11 +78,12 @@ donor/batch signal; the baseline leaks least.
    its same-density controls: sign-shuffled ties it (0.699) and **random is higher (0.731)**. So
    the *specific* DoRothEA biology adds nothing over a random graph of the same density — what
    little the mask does is explained by sparsity, not regulatory content.
-3. **A faint, honestly-reported structural signal.** Under low-data and noise, grn_real is
-   consistently above grn_rewired (e.g. k=16: 0.653 vs 0.599; p=0.3: 0.609 vs 0.545). So the real
-   topology beats a degree-matched shuffle — some biologically-relevant structure survives — but
-   it is small, never reaches the baseline, and is contradicted by the full-data random control.
-   We scope the claim to exactly that: weak evidence of structure, insufficient to be useful.
+3. **A faint, honestly-reported structural signal — and density is the bigger lever.** Real vs
+   rewired shows some biologically-relevant structure survives (full-data and noise, ~0.02–0.05),
+   but the density ablation makes clear that most of what improves the prior is *sparsity*: the
+   A-subset ≈ baseline, yet a rewired A-graph matches it, and under low data the rewired graph is
+   best. So the specific regulatory topology is a minor factor; graph *density/regularization*
+   dominates, and neither beats the baseline.
 4. **Biology vs batch.** Cell type (a strong, largely linear signal — PCA tops the table) is
    captured best by the *least* constrained methods; disease (confounded) by none. The prior buys
    neither better biology nor lower donor leakage.
@@ -83,8 +100,8 @@ donor/batch signal; the baseline leaks least.
 
 ## Limitations
 Single dataset; n=500 pseudobulk; disease confounded with donor; 2 seeds; no hyperparameter
-search; one prior-encoding (hard mask) of many; probes limited to logistic/kNN; density ablations
-(A/AB) built but not swept in the main run.
+search; one prior-encoding (hard mask) of many; probes limited to logistic/kNN. The density
+ablation used one low-data / noise point each rather than a full grid.
 
 ## What would make the experiment biologically stronger
 - A readout that is genuinely *regulatory* (predict perturbation response or measured TF activity)
@@ -95,6 +112,6 @@ search; one prior-encoding (hard mask) of many; probes limited to logistic/kNN; 
 
 ## What I deliberately left out (48h scope)
 Raw single-cell modeling; STATE/metabolic/pathway priors (out of scope); GNN (masked-MLP was the
-primary, pure-torch choice); hyperparameter search; backup datasets; the A/AB density sweep. I
-prioritized a *fair, capacity-matched* baseline-vs-prior-vs-corruption comparison on one readout
-over broad but shallow coverage.
+primary, pure-torch choice); hyperparameter search; backup datasets. I prioritized a *fair,
+capacity-matched* baseline-vs-prior-vs-corruption comparison (plus a density ablation with
+rewired controls) on one readout over broad but shallow coverage.
