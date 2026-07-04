@@ -5,8 +5,39 @@ per chunk. Goal: enough biology to understand — and *defend* — every choice 
 No background assumed.
 
 > **How to use this:** read one chunk, watch the video only if you want it to stick, move on.
-> Chunks 1–3 = core biology. 4 = the regulatory network (the "GRN" in the title). 5 = how it's
-> measured. 6–7 = the actual project. 8 = a cheat-sheet to skim before the interview.
+> Chunk 0 = the cells themselves. 1–3 = core biology. 4 = the regulatory network (the "GRN" in
+> the title). 5 = how it's measured. 6–7 = the actual project. 8 = a cheat-sheet to skim before
+> the interview.
+
+---
+
+## Chunk 0 — Meet the cells (the cast) *(~4 min)*
+
+Our data is **PBMC** — *peripheral blood mononuclear cells*, i.e. the immune cells floating in a
+blood sample. Different cell **types** do different jobs, and telling them apart is the main task
+in this project. The headliners:
+
+- **T-cells** — the soldiers/coordinators. Patrol for infected or abnormal cells; either kill
+  them or direct the wider immune response. (Mature in the **T**hymus.) They come in subtypes:
+  - **CD4 "helper" T-cells** — coordinate other immune cells.
+  - **CD8 "killer" T-cells** — destroy infected cells directly.
+- **B-cells** — the antibody factories. Make **antibodies**, proteins that lock onto a specific
+  pathogen to neutralize or flag it. (Mature in the **B**one marrow.)
+- **NK (natural killer) cells** — fast first-responders that kill stressed/infected cells without
+  needing prior exposure.
+- **Monocytes / dendritic cells** — the "big eaters + messengers": engulf pathogens and show
+  their fragments to T-cells to kick off a targeted response.
+
+Our dataset labels **15 fine-grained types** (e.g. *naive vs memory vs effector* CD4/CD8 T-cells,
+naive/memory B-cells, classical/non-classical monocytes, NK cells, dendritic cells). Whenever this
+crash course says "T-cell vs B-cell," picture two of these 15 labels — the thing a good embedding
+should be able to separate.
+
+**Why they differ (preview of Chunk 1):** every one of these cells carries the *same DNA*; they
+differ because each **switches on a different set of genes**. That difference is what we measure
+and model.
+
+🎥 *Optional:* [Amoeba Sisters — Immune System](https://www.youtube.com/watch?v=fSEFXl2XQpc) (9 min)
 
 ---
 
@@ -163,6 +194,8 @@ the brief asked for.
 
 ## Chunk 8 — Interview cheat-sheet *(skim, ~3 min)*
 
+- **The cells (PBMC):** T-cells (CD4 helper / CD8 killer), B-cells (antibodies), NK cells,
+  monocytes/dendritic cells. Same DNA, different genes on → different types (15 in our data).
 - **Central dogma:** DNA → (transcription) → mRNA → (translation) → protein.
 - **Gene expression = mRNA amount.** Our data = mRNA counts per gene per cell.
 - **Dropout:** random zeros from shallow sampling. **Pseudobulk:** average cells per
