@@ -24,14 +24,29 @@ def _thin_counts(counts, p, rng):
     return np.log1p(thinned / lib * 1e4)
 
 
-def compute_tfact(data):
-    """decoupler ULM TF-activity of the pseudobulk (a fixed, per-sample GRN transform)."""
+_DOR_NET = None
+
+
+def _dorothea_net():
+    global _DOR_NET
+    if _DOR_NET is None:
+        import decoupler as dc
+        _DOR_NET = dc.op.dorothea(organism="human")
+    return _DOR_NET
+
+
+def compute_tfact_mat(X, genes):
+    """decoupler ULM TF-activity for an expression matrix (per-sample, fixed GRN transform)."""
     import anndata as ad
     import decoupler as dc
-    A = ad.AnnData(data["X"].copy())
-    A.var_names = list(data["genes"])
-    dc.mt.ulm(A, net=dc.op.dorothea(organism="human"), tmin=5, verbose=False)
+    A = ad.AnnData(np.asarray(X).copy())
+    A.var_names = list(genes)
+    dc.mt.ulm(A, net=_dorothea_net(), tmin=5, verbose=False)
     return np.asarray(A.obsm["score_ulm"])
+
+
+def compute_tfact(data):
+    return compute_tfact_mat(data["X"], data["genes"])
 
 
 def make_embedder(spec, data, train_idx, device, seed, epochs, X_input):
@@ -46,10 +61,16 @@ def make_embedder(spec, data, train_idx, device, seed, epochs, X_input):
         p = PCA(n_components=k, random_state=seed).fit(X_input[train_idx])
         return p.transform(X_input)
 
-    if spec == "dc_tfact":
-        # decoupler TF-activity embedding (canonical non-learned GRN prior). Deterministic
-        # per-sample transform -> no cross-sample fitting, no leakage. Precomputed in the runner.
-        return data["tfact"]
+    if spec in ("dc_tfact", "dc_tfact_pca"):
+        # decoupler TF-activity embedding (canonical non-learned GRN prior). Reuse the precomputed
+        # clean activity for full/low-data; recompute on the noised input under the noise condition
+        # (else it would unfairly see clean data). Per-sample transform -> no leakage.
+        tf = data["tfact"] if X_input is data["X"] else compute_tfact_mat(X_input, genes)
+        if spec == "dc_tfact":
+            return tf
+        from sklearn.decomposition import PCA           # dimension-matched control (64-d)
+        k = min(64, len(train_idx) - 1, tf.shape[1])
+        return PCA(n_components=k, random_state=seed).fit(tf[train_idx]).transform(tf)
 
     # soft prior: dense first layer + penalty pulling off-regulon weights to 0 (spec 'grn_soft[:lam]')
     soft_mask = None

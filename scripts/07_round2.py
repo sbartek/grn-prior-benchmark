@@ -23,7 +23,7 @@ from grn_bench.data import load_aligned           # noqa: E402
 from grn_bench.experiments import run_cv          # noqa: E402
 
 SEEDS = (0, 1, 2, 3, 4)
-MODELS = ["pca", "baseline", "dc_tfact", "grn_soft:0.001", "grn_soft:0.01", "grn_real"]
+MODELS = ["pca", "baseline", "dc_tfact", "dc_tfact_pca", "grn_soft:0.001", "grn_soft:0.01", "grn_real"]
 CONDITIONS = ["full", "lowdata:4", "lowdata:8", "lowdata:16", "noise:0.3", "noise:0.1"]
 TASK = "cell_type"
 
