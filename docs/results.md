@@ -27,6 +27,11 @@ Full write-up: [`memo/memo.md`](https://github.com/sbartek/grn-prior-benchmark/b
 just dimensionality. But it only ties PCA at full data and wins under **low data** (CollecTRI
 strongest). At matched 64-d, `dc_tfact_pca` ≈ baseline.
 
+## Bottleneck-dimension sensitivity (not a tuning artifact)
+![bottleneck](img/fig_bottleneck.png)
+Across z ∈ {32, 64, 128} the ordering PCA ≥ baseline ≈ soft-prior > hard-mask is stable and
+`grn_real` is always worst. A wider bottleneck helps the mask but never enough to reach baseline.
+
 ## Second dataset (COVID PBMC) — external validity
 ![covid](img/fig_covid.png)
 Same ordering (PCA ≥ TF-activity > baseline ≈ GRN-mask > soft prior) → not RA-specific.

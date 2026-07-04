@@ -89,6 +89,11 @@ baseline 0.588) but `grn_rewired` (0.646) matches them → again regularization,
 **External validity.** The full ordering (PCA ≥ TF-activity > baseline ≈ GRN-mask > soft-prior)
 replicates on COVID → not an artifact of the RA dataset.
 
+**Bottleneck-dimension sensitivity.** Sweeping z ∈ {32, 64, 128}, the ordering PCA ≥ baseline ≈
+soft-prior > hard-mask holds in every condition, and `grn_real` is *always* worst. A wider
+bottleneck helps the hard mask (full: 0.67 → 0.71 → 0.75) but it never reaches the baseline
+(≈0.79) — so the negative-for-constraints result is not a z=64 tuning artifact.
+
 ## Interpretation
 The GRN is not useless — as a TF-activity transform it encodes real regulatory signal and gives a
 genuine low-data/regularization benefit (stronger with CollecTRI). But it is **not more
@@ -122,9 +127,10 @@ so the CollecTRI arm is not dimension-matched to DoRothEA; no formal HPO (by des
 Deliberately none. The brief states peak performance is not the goal; all models share
 architecture/budget *by design*, so tuning one more than another would break the fairness that
 makes the comparison valid (scIB's benchmark likewise used defaults). Instead we swept prior
-strength (soft-λ), ran 5 seeds for variance, and used matched-dimension and rewired controls — the
-robustness checks that actually guard the conclusion. A bottleneck-dim sensitivity sweep (32/64/128)
-is the one cheap extension that would further rule out a tuning artifact.
+strength (soft-λ), ran 5 seeds for variance, used matched-dimension and rewired controls, and swept
+the bottleneck dimension (32/64/128) — the robustness checks that actually guard the conclusion. The
+bottleneck sweep confirms the ordering is stable and the hard mask is always worst, so the result is
+not a z=64 tuning artifact.
 
 ## What would make it biologically stronger
 A genuinely *regulatory* readout (perturbation response or measured TF activity) rather than

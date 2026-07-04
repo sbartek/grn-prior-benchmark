@@ -94,6 +94,24 @@ def grouped_bar(csv, order, conds, title, fname, ylim=(0, 1.0), task=None):
     fig.tight_layout(); fig.savefig(FIG / fname, dpi=130); plt.close(fig)
 
 
+def bottleneck():
+    p = TAB / "bottleneck.csv"
+    if not p.exists():
+        return
+    dd = pd.read_csv(p)
+    conds = ["full", "lowdata:8", "noise:0.3"]
+    models = ["pca", "baseline", "grn_soft:0.001", "grn_real"]
+    fig, axes = plt.subplots(1, 3, figsize=(14, 4.2), sharey=True)
+    for ax, cond in zip(axes, conds):
+        for m in models:
+            s = dd[(dd.model == m) & (dd.condition == cond)].sort_values("z")
+            ax.errorbar(s["z"], s["mean"], yerr=s["std"], marker="o", capsize=3, label=m)
+        ax.set_title(cond); ax.set_xlabel("bottleneck dim z"); ax.set_xticks([32, 64, 128])
+    axes[0].set_ylabel("cell-type macro-F1"); axes[0].legend(fontsize=8)
+    fig.suptitle("Bottleneck-dim sensitivity: ordering stable, hard mask always worst")
+    fig.tight_layout(); fig.savefig(FIG / "fig_bottleneck.png", dpi=130); plt.close(fig)
+
+
 def round2_and_covid():
     grouped_bar("round2.csv",
                 ["pca", "baseline", "dc_tfact", "dc_tfact_pca", "grn_soft:0.001", "grn_real"],
@@ -118,4 +136,5 @@ if __name__ == "__main__":
     bar_leakage()
     bar_density()
     round2_and_covid()
+    bottleneck()
     print("[figures] wrote fig_full, fig_lowdata, fig_noise, fig_leakage, fig_density, fig_round2, fig_covid")
