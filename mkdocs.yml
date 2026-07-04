@@ -20,6 +20,7 @@ markdown_extensions:
   - pymdownx.highlight
 nav:
   - Overview: index.md
+  - Crash course (DNA→RNA→project): crash-course.md
   - Concepts (biology primer): concepts.md
   - Methods & steps: methods.md
   - Results: results.md
