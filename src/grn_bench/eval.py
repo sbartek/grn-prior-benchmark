@@ -13,34 +13,47 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.preprocessing import StandardScaler
 
 
-def _fit_score(clf, Xtr, ytr, Xte, yte):
+def _fit_score(clf, Xtr, ytr, Xte, yte, labels):
     sc = StandardScaler().fit(Xtr)
     clf.fit(sc.transform(Xtr), ytr)
-    return f1_score(yte, clf.predict(sc.transform(Xte)), average="macro")
+    # fixed `labels` so every fold's macro-F1 spans the SAME class set (not just those present)
+    return f1_score(yte, clf.predict(sc.transform(Xte)), average="macro", labels=labels)
 
 
-def probe_precomputed(emb, y, groups, folds, kind="linear"):
+def probe_precomputed(emb, y, groups, folds, kind="linear", labels=None):
     """Score an embedding whose per-fold splits are given (so AE + probe share folds)."""
+    if labels is None:
+        labels = np.unique(y)
     scores = []
     for tr, te in folds:
         if len(np.unique(y[tr])) < 2:
             continue
         clf = LogisticRegression(max_iter=2000, C=1.0) if kind == "linear" \
             else KNeighborsClassifier(n_neighbors=min(15, len(tr) - 1))
-        scores.append(_fit_score(clf, emb[tr], y[tr], emb[te], y[te]))
+        scores.append(_fit_score(clf, emb[tr], y[tr], emb[te], y[te], labels))
     return float(np.mean(scores)), float(np.std(scores))
 
 
 def donor_grouped_folds(groups, n_splits=5, seed=0):
-    """GroupKFold splits by donor. Deterministic; seed kept for API symmetry."""
-    gkf = GroupKFold(n_splits=n_splits)
-    dummy_y = np.zeros(len(groups))
-    return list(gkf.split(np.arange(len(groups)), dummy_y, groups))
+    """Donor-grouped CV folds, RE-SHUFFLED per seed so each seed is a genuine re-partition
+    (plain GroupKFold is deterministic and would give identical folds every seed)."""
+    groups = np.asarray(groups)
+    donors = np.array(sorted(set(groups)))
+    np.random.default_rng(seed).shuffle(donors)
+    idx = np.arange(len(groups))
+    folds = []
+    for part in np.array_split(donors, n_splits):        # balanced, disjoint donor blocks
+        te = idx[np.isin(groups, part)]
+        tr = idx[~np.isin(groups, part)]
+        folds.append((tr, te))
+    return folds
 
 
 def donor_predictability(emb, donor, n_splits=5, seed=0):
     """How well donor identity is decodable from the embedding (leakage proxy; lower=better)."""
     y = np.asarray(donor)
+    _, counts = np.unique(y, return_counts=True)
+    n_splits = max(2, min(n_splits, int(counts.min())))   # StratifiedKFold needs n_splits <= min class count
     skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=seed)
     accs = []
     for tr, te in skf.split(emb, y):

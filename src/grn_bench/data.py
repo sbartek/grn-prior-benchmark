@@ -22,11 +22,14 @@ def load_aligned(pseudobulk="data/pseudobulk.h5ad", graph="data/graph.npz"):
         first_col.setdefault(s, i)
     idx = np.array([first_col[s] for s in genes])          # graph gene -> pseudobulk column
 
+    counts_full = pdata.layers["counts"].toarray().astype(np.float32)
+    lib_full = counts_full.sum(1)                           # full-transcriptome library / sample
     X = pdata.X.toarray()[:, idx].astype(np.float32)        # (n_samples x n_genes), log-norm
-    counts = pdata.layers["counts"].toarray()[:, idx].astype(np.float32)  # raw, for noise sims
+    counts = counts_full[:, idx]                            # raw graph-gene counts, for noise sims
     return {
         "X": X,
         "counts": counts,
+        "lib_full": lib_full,                               # so noise-thinning matches Step-2 CP10K
         "obs": pdata.obs.reset_index(drop=True),
         "genes": genes,
         "tfs": tfs,

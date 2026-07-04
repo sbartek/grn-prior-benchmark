@@ -16,10 +16,11 @@ from . import models as M
 from .eval import probe_precomputed
 
 
-def _thin_counts(counts, p, rng):
-    """Binomial thinning: keep each molecule w.p. p, then CP10K + log1p (matches Step 2)."""
+def _thin_counts(counts, p, rng, lib_full):
+    """Binomial thinning of graph-gene counts, renormalised by the FULL-transcriptome library
+    (× p, its expected thinned value) so the scale matches Step-2 CP10K and p=1 recovers clean X."""
     thinned = rng.binomial(counts.astype(np.int64), p).astype(np.float32)
-    lib = thinned.sum(1, keepdims=True)
+    lib = (np.asarray(lib_full, dtype=np.float32) * p).reshape(-1, 1)
     lib[lib == 0] = 1.0
     return np.log1p(thinned / lib * 1e4)
 
@@ -34,13 +35,26 @@ def _net(name):
     return _NETS[name]
 
 
+def corrupted_net(base="dorothea", kind="rewired", seed=0):
+    """Corrupt a DoRothEA/CollecTRI net for the TF-activity nulls: 'rewired' = degree-preserving
+    target permutation (same regulon sizes, scrambled membership); 'sign' = permuted edge signs."""
+    net = _net(base).copy()
+    rng = np.random.default_rng(seed)
+    if kind == "rewired":
+        net["target"] = rng.permutation(net["target"].to_numpy())
+    elif kind == "sign":
+        net["weight"] = rng.permutation(net["weight"].to_numpy())
+    return net.drop_duplicates(subset=["source", "target"]).reset_index(drop=True)
+
+
 def compute_tfact_mat(X, genes, net="dorothea"):
-    """decoupler ULM TF-activity for an expression matrix (per-sample, fixed GRN transform)."""
+    """decoupler ULM TF-activity for an expression matrix (per-sample, fixed GRN transform).
+    `net` may be a name (cached lookup) or a decoupler-style DataFrame (used directly)."""
     import anndata as ad
     import decoupler as dc
     A = ad.AnnData(np.asarray(X).copy())
     A.var_names = list(genes)
-    dc.mt.ulm(A, net=_net(net), tmin=5, verbose=False)
+    dc.mt.ulm(A, net=(_net(net) if isinstance(net, str) else net), tmin=5, verbose=False)
     return np.asarray(A.obsm["score_ulm"])
 
 
@@ -76,11 +90,21 @@ def make_embedder(spec, data, train_idx, device, seed, epochs, X_input, z_dim=64
         return data["tfact_collectri"] if X_input is data["X"] \
             else compute_tfact_mat(X_input, genes, net="collectri")
 
+    if spec in ("dc_tfact_rewired", "dc_tfact_sign"):
+        # TF-activity on a CORRUPTED DoRothEA net — the transform-side analogue of the encoder's
+        # rewired control. If dc_tfact ~ dc_tfact_rewired, even the transform signal is just
+        # structure, not the specific regulons.
+        kind = "rewired" if spec == "dc_tfact_rewired" else "sign"
+        key = f"tfact_{kind}"
+        if X_input is data["X"] and key in data:
+            return data[key]
+        return compute_tfact_mat(X_input, genes, net=corrupted_net("dorothea", kind, 0))
+
     if spec == "rand_proj":
         # matched-dimension RANDOM linear features (same dim as TF-activity). Fixed transform.
         # If this matches dc_tfact, the TF-activity gain is dimensionality, not biology.
         k = data["tfact"].shape[1]
-        R = np.random.default_rng(12345).standard_normal((n_genes, k)).astype(np.float32) / np.sqrt(k)
+        R = np.random.default_rng(1000 + seed).standard_normal((n_genes, k)).astype(np.float32) / np.sqrt(k)
         return X_input @ R
 
     # soft prior: dense first layer + penalty pulling off-regulon weights to 0 (spec 'grn_soft[:lam]')
@@ -123,12 +147,13 @@ def run_cv(data, spec, task_key, condition, device, seeds=(0, 1), n_splits=5, ep
     from .eval import donor_grouped_folds
     y = data["obs"][task_key].astype(str).values
     donor = data["obs"]["donor_id"].astype(str).values
+    labels = np.unique(y)                      # fixed class set -> comparable macro-F1 across folds
     results, flat = [], []
     for seed in seeds:
         rng = np.random.default_rng(seed)
         if condition.startswith("noise:"):
             p = float(condition.split(":")[1])
-            X_input = _thin_counts(data["counts"], p, rng)
+            X_input = _thin_counts(data["counts"], p, rng, data["lib_full"])
         else:
             X_input = data["X"]
 
@@ -141,7 +166,7 @@ def run_cv(data, spec, task_key, condition, device, seeds=(0, 1), n_splits=5, ep
                 tr_donors = rng.permutation(np.unique(donor[tr]))[:k]
                 tr_use = tr[np.isin(donor[tr], tr_donors)]
             emb = make_embedder(spec, data, tr_use, device, seed, epochs, X_input, z_dim=z_dim)
-            f1, _ = probe_precomputed(emb, y, donor, [(tr_use, te)])
+            f1, _ = probe_precomputed(emb, y, donor, [(tr_use, te)], labels=labels)
             fold_scores.append(f1)
             flat.append({"seed": seed, "fold": fi, "f1": f1})
         results.append(float(np.mean(fold_scores)))
