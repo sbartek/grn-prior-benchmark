@@ -1,0 +1,20 @@
+[data] X=(500, 8376) tfact=(500, 293) collectri=(500, 675) device=mps
+  baseline             full       F1=0.794±0.008
+  pca                  full       F1=0.862±0.006
+  dc_tfact_pca         full       F1=0.793±0.000
+  rand_proj            full       F1=0.767±0.000
+  dc_tfact             full       F1=0.864±0.000
+  dc_tfact_collectri   full       F1=0.858±0.000
+  baseline             lowdata:8  F1=0.640±0.022
+  pca                  lowdata:8  F1=0.653±0.023
+  dc_tfact_pca         lowdata:8  F1=0.633±0.017
+  rand_proj            lowdata:8  F1=0.627±0.016
+  dc_tfact             lowdata:8  F1=0.691±0.016
+  dc_tfact_collectri   lowdata:8  F1=0.740±0.012
+  baseline             noise:0.3  F1=0.733±0.015
+  pca                  noise:0.3  F1=0.769±0.012
+  dc_tfact_pca         noise:0.3  F1=0.685±0.020
+  rand_proj            noise:0.3  F1=0.640±0.027
+  dc_tfact             noise:0.3  F1=0.730±0.017
+  dc_tfact_collectri   noise:0.3  F1=0.779±0.014
+[done]

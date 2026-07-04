@@ -11,12 +11,30 @@ between-subjects → disease is confounded with donor. Consequence: **cell type*
 readout, **disease** = suggestive only, always splitting by donor.
 
 ## Headline
-**The DoRothEA prior did not usefully improve embeddings — and where it seems to, density (not
-biology) is the cause.** The full ABC graph trails PCA and the baseline everywhere; a
-high-confidence A-subset closes the gap, but rewired-A controls show that is a
-sparsity/regularization effect, not regulatory structure. The specific topology adds only a small
-margin over its rewired control (full data, noise) and never beats the baseline. Disease is not
-decodable from held-out donors. A fair, mostly **negative result**, carefully scoped.
+**How you use the GRN matters more than whether you use it.** As a *deep-encoder constraint*
+(hard/soft mask) it hurts, and a rewired graph does as well → regularization, not biology. As a
+*fixed TF-activity transform* (decoupler ULM) it carries real signal — beats a matched-dimension
+random projection everywhere — and **beats PCA and the baseline in the low-data regime**, though
+at full data it only ties PCA. Not DoRothEA-specific (CollecTRI ≥ it) and replicates on COVID.
+Full write-up: [`memo/memo.md`](https://github.com/sbartek/grn-prior-benchmark/blob/main/memo/memo.md).
+
+## Round 2 — TF-activity vs learned encoders (primary dataset)
+![round2](img/fig_round2.png)
+
+## Dimensionality vs biology (matched-dim random + CollecTRI controls)
+![dimcheck](img/fig_dimcheck.png)
+`dc_tfact` (293-d) beats `rand_proj` (293-d random features) everywhere → the biology is real, not
+just dimensionality. But it only ties PCA at full data and wins under **low data** (CollecTRI
+strongest). At matched 64-d, `dc_tfact_pca` ≈ baseline.
+
+## Second dataset (COVID PBMC) — external validity
+![covid](img/fig_covid.png)
+Same ordering (PCA ≥ TF-activity > baseline ≈ GRN-mask > soft prior) → not RA-specific.
+
+## COVID disease (3-class, decodable unlike RA)
+![covid_disease](img/fig_covid_disease.png)
+Disease *is* decodable here (PCA best, 0.715). GRN-mask models beat the overfit dense baseline, but
+`grn_rewired` matches them → regularization, not biology.
 
 ## Full-data comparison
 ![full](img/fig_full.png)

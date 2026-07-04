@@ -23,6 +23,15 @@ Compare the **real** DoRothEA graph against a **degree-preserving rewired** grap
 corrupted graph helps just as much, any benefit is **structured sparsity / regularization, not
 biology**. This is the comparison the exercise is really about.
 
+## Headline finding
+
+**How you use the GRN matters more than whether you use it.** Baked into a learned encoder
+(hard/soft mask) it *hurts* and a rewired graph works as well (regularization, not biology). Used
+the classical way (decoupler TF-activity transform) it carries *real* signal — beats a
+matched-dimension random projection — and **beats PCA/baseline when data is scarce**, though it
+only ties PCA at full data. Not DoRothEA-specific (CollecTRI ≥ it); replicates on a second dataset.
+See [Results](results.md) and the [memo](https://github.com/sbartek/grn-prior-benchmark/blob/main/memo/memo.md).
+
 ## Navigate
 
 - **[Concepts](concepts.md)** — plain-language biology primer (DNA → mRNA → expression →

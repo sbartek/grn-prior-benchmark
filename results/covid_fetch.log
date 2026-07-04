@@ -1,0 +1,7 @@
+/Users/barteks/.local/share/uv/python/cpython-3.11.14-macos-aarch64-none/lib/python3.11/functools.py:909: ImplicitModificationWarning: Transforming to str index.
+  return dispatch(args[0].__class__)(*args, **kw)
+/Users/barteks/.local/share/uv/python/cpython-3.11.14-macos-aarch64-none/lib/python3.11/functools.py:909: ImplicitModificationWarning: Transforming to str index.
+  return dispatch(args[0].__class__)(*args, **kw)
+[fetch] census 2025-11-08, dataset 2a498ace-872a-4935-984b-1afa70fd9886 ...
+[ok] 422220 cells x 61497 genes
+[write] data/covid_raw.h5ad (4603 MB)

@@ -5,113 +5,135 @@ pseudobulk expression embeddings than a matched non-graph baseline — where "be
 embedding captures biological state (cell type, disease), not that it reconstructs expression —
 and does any benefit hold up under low-data, noise, and graph corruption?
 
-**Answer (short).** Largely no, with an instructive nuance. On the trustworthy readout (cell
-type) the *full* DoRothEA prior (A+B+C) underperforms both PCA and an unconstrained autoencoder
-everywhere. Restricting to high-confidence edges (confidence **A**) removes almost all of that gap
-— but a **density ablation with degree-preserving rewired controls shows this is mostly a sparsity
-/ regularization effect, not regulatory biology**: a rewired A-graph does as well or better under
-low data. The *specific* topology contributes only a small, consistent lift over its rewired
-control at full data and under noise (~0.02–0.05 F1), and it never beats the plain baseline.
-Disease is not decodable from held-out donors, so it cannot adjudicate. Net: a fair, mostly
-negative result where what *looks* like "the prior helps" is explained by density, not biology.
+**Answer (short).** **How you use the GRN matters more than whether you use it.**
+- As a **deep-encoder constraint** (hard mask or soft graph-penalty): it *hurts* — consistently
+  below PCA and a plain autoencoder — and a degree-preserving **rewired** graph does as well,
+  so what little it offers is regularization, not the specific biology.
+- As a **fixed feature transform** (decoupler ULM TF-activity, the classical use): it carries
+  **real** biological signal — it beats a **matched-dimension random projection** everywhere —
+  and it **beats PCA and the baseline in the low-data regime** (where priors are supposed to
+  help). At full data it merely ties PCA; under noise it ties the baseline.
+- The effect is **not DoRothEA-specific** (CollecTRI reproduces and slightly exceeds it) and
+  **replicates on a second dataset** (COVID PBMC). Disease is decodable on the 3-class COVID data
+  (PCA best) but not on the fully donor-confounded 2-class RA data.
 
-## Data & task
-CELLxGENE RA PBMC (`d18736c3…`): 108,717 cells → **pseudobulk by (donor × cell_type)**, 536
-groups → **500 kept** (≥10 cells), CP10K+log1p, 21,572 genes. Two readouts: **cell type**
-(15 classes, primary) and **disease** (RA vs normal, secondary). All scoring uses **donor-grouped
-5-fold CV** with the encoder retrained on train donors inside each fold — so neither encoder nor
-probe ever sees a held-out donor. Metric: macro-F1, mean over 2 seeds.
+A fair, carefully-scoped result: the prior encodes genuine biology, but only helps when applied
+the classical way and mostly when data is scarce; imposing it on a learned encoder is worse than
+doing nothing.
+
+## Data, task, evaluation
+CELLxGENE RA PBMC (`d18736c3…`, 108,717 cells) → **pseudobulk by (donor × cell_type)**, 536
+groups → **500 kept** (≥10 cells), CP10K+log1p, restricted to the 8,376 genes shared with
+DoRothEA. Readouts: **cell type** (15 classes, primary) and **disease** (secondary). All scoring
+is **donor-grouped 5-fold CV** with the encoder retrained on train donors *inside* each fold — so
+neither encoder nor probe ever sees a held-out donor. Metric: macro-F1 (mean over 5 seeds; paired
+deltas computed at matched (seed, fold)).
 
 ## Is the dataset suitable?
-Confirmed on data: **balanced 18 RA / 18 normal**, **no sex confound** (12F/6M in both arms),
-**single assay** (10x 3′ v3, so no assay–disease confound), 15 cell types (some rare). The design
-is **between-subjects**, so disease is confounded with **donor identity**. Consequence: cell type
-is the trustworthy readout; **disease is reported as suggestive only**.
+Balanced **18 RA / 18 normal**, **no sex confound** (12F/6M both arms), **single assay** (10x 3′
+v3 → no assay–disease confound), 15 cell types. But the design is **between-subjects**, so disease
+is confounded with **donor identity**. Consequence: cell type is trustworthy; RA disease is
+reported as suggestive only. (The COVID replication has 3 disease states across 75 donors — still
+between-subjects, but less degenerate, and there disease *is* decodable.)
 
-## What was compared
-Shared autoencoder (gene → hidden(411) → z=64 → … → gene), MSE reconstruction, **no labels**. The
-*only* structural difference is the first encoder layer:
-- **baseline** — dense; **PCA** — linear floor.
-- **grn_real** — masked so each hidden unit is a TF aggregating its regulon (effective weight =
-  mask·sign·softplus(raw)); 8,376 genes × 411 TFs, 30,609 edges.
-- **graph controls at matched density** — degree-preserving **rewired**, **sign-shuffled**,
-  **random**. All share the identical gene set, so any difference is graph *structure*, not
-  feature selection. Real-vs-controls is capacity-matched exactly (same #params, same #edges).
+## Models compared (all share the gene set, capacity where noted, and training budget)
+- **PCA** (linear floor) and **baseline** (dense autoencoder) — 64-d, no prior.
+- **GRN-as-constraint**: `grn_real` (first layer masked to signed TF regulons), `grn_soft:λ`
+  (dense layer + penalty shrinking off-regulon weights). Controls at matched density/degree:
+  `grn_rewired`, `grn_sign_shuffled`, `grn_random`.
+- **GRN-as-transform**: `dc_tfact` (decoupler ULM TF-activity, 293-d), `dc_tfact_pca` (→PCA-64,
+  dimension-matched), `dc_tfact_collectri` (CollecTRI net, 675-d).
+- **Null**: `rand_proj` (random linear features at the TF-activity dimension).
 
-## Results
+## Results (cell-type macro-F1)
 
-**Cell type (macro-F1).** The prior hurts, everywhere:
+| model (dim) | full | lowdata k=8 | noise p=0.3 |
+|---|---|---|---|
+| PCA (64) | 0.862 | 0.653 | **0.769** |
+| baseline AE (64) | 0.794 | 0.640 | 0.733 |
+| **dc_tfact** (293) | **0.864** | **0.691** | 0.730 |
+| **dc_tfact_collectri** (675) | 0.858 | **0.740** | **0.779** |
+| dc_tfact_pca (64) | 0.793 | 0.633 | 0.685 |
+| rand_proj (293) | 0.767 | 0.627 | 0.640 |
+| grn_soft:0.001 | 0.754 | 0.637 | 0.721 |
+| grn_real (hard mask) | 0.714 | 0.569 | 0.597 |
+| grn_soft:0.01 | 0.619 | 0.498 | 0.661 |
 
-| condition | PCA | baseline | grn_real | grn_rewired | grn_sign_shuf | grn_random |
-|---|---|---|---|---|---|---|
-| full | **0.868** | 0.791 | 0.699 | 0.650 | 0.699 | 0.731 |
-| lowdata k=4 | – | **0.540** | 0.485 | 0.457 | – | – |
-| lowdata k=8 | – | **0.648** | 0.553 | 0.525 | – | – |
-| lowdata k=16 | – | **0.727** | 0.653 | 0.599 | – | – |
-| noise p=0.3 | – | **0.743** | 0.609 | 0.545 | – | – |
-| noise p=0.1 | – | **0.661** | 0.509 | 0.448 | – | – |
+**Reading it:**
+1. **GRN-as-constraint hurts.** `grn_real` and `grn_soft` trail both PCA and the baseline
+   everywhere; *more* prior is *worse* (soft 0.001 > soft 0.01 > hard). The problem isn't mask
+   hardness — it's imposing the graph on the encoder at all.
+2. **The corruption test kills the "it's biology" story for the constraint.** At matched density
+   `grn_real` ≈ `grn_rewired` ≈ `grn_random` (and a **density ablation** shows the same: a
+   high-confidence A-subset ≈ baseline, but a rewired-A graph matches it). Any constraint benefit
+   is sparsity/regularization, not regulatory content.
+3. **The transform is different — biology is real there.** `dc_tfact` (293-d) beats the
+   **matched-dimension random projection** `rand_proj` (293-d) in every condition (+0.06–0.10),
+   so the DoRothEA weights carry genuine cell-type signal beyond dimensionality.
+4. **…but it doesn't beat a strong simple baseline except when data is scarce.** At full data
+   `dc_tfact` ≈ PCA (0.864 vs 0.862, using 4× the dimensions); under **low data** it clearly beats
+   PCA and baseline (0.691 / CollecTRI 0.740 vs 0.653), the classic small-data regularization win;
+   under noise it ties the baseline. `dc_tfact_pca` (dimension-matched) ≈ baseline — the full-rep
+   advantage needs the extra dimensions.
+5. **Not prior-specific.** CollecTRI ≥ DoRothEA (notably under low-data/noise) → the effect is a
+   property of "TF-activity as a transform," and a broader/better network helps more.
 
-**Disease (macro-F1).** Everything sits at ~0.42–0.49 (≈ chance for this binary task); no model
-decodes disease from held-out donors. The donor confound dominates, as predicted. Not adjudicative.
+**Disease.** On RA (2-class, fully donor-confounded) nothing decodes disease from held-out donors
+(≈ chance). On **COVID (3-class, 75 donors)** disease *is* decodable — PCA best (0.715), then
+TF-activity (~0.66–0.67); the GRN-mask models beat the *overfit* dense baseline (grn_real 0.654 vs
+baseline 0.588) but `grn_rewired` (0.646) matches them → again regularization, not biology.
 
-**Donor leakage** (kNN donor accuracy, lower = less leakage): baseline 0.086, random 0.098,
-grn_real 0.114, sign_shuf 0.132, rewired 0.136, PCA 0.166. The prior does **not** reduce
-donor/batch signal; the baseline leaks least.
+**Biology vs batch.** Donor-leakage (kNN donor accuracy, lower better): baseline 0.086 < random
+0.098 < grn_real 0.114 < … < PCA 0.166. The prior does not reduce donor signal.
 
-**Density ablation (confidence A / A+B / A+B+C, with rewired controls; cell type macro-F1).**
+**External validity.** The full ordering (PCA ≥ TF-activity > baseline ≈ GRN-mask > soft-prior)
+replicates on COVID → not an artifact of the RA dataset.
 
-| condition | baseline | real_A | rewired_A | real_AB | real (ABC) |
-|---|---|---|---|---|---|
-| full | 0.791 | 0.788 | 0.767 | 0.745 | 0.699 |
-| lowdata k=8 | 0.648 | 0.671 | **0.686** | 0.586 | 0.553 |
-| noise p=0.3 | 0.743 | 0.705 | 0.655 | 0.638 | 0.609 |
+## Interpretation
+The GRN is not useless — as a TF-activity transform it encodes real regulatory signal and gives a
+genuine low-data/regularization benefit (stronger with CollecTRI). But it is **not more
+informative than raw-expression PCA**, which captures the same cell-type structure more compactly;
+and **injecting it into a learned encoder is strictly counterproductive**, adding constraint whose
+only measurable effect (rewired-equivalent) is regularization. The honest one-liner: *use the GRN
+as a feature transform, not as a network prior on a deep model, and expect help mainly when data
+is limited.*
 
-Sparser, higher-confidence graphs are *better* (real_A ≫ real). But real_A vs rewired_A is the
-tell: under low data the **rewired** A-graph is best (0.686 > 0.671), so that regime's gains are
-sparsity, not biology; only at full data (0.788 vs 0.767) and under noise (0.705 vs 0.655) does
-the true topology add a small margin over its rewired control.
-
-## Interpretation — did the GRN help, and where?
-1. **No, on the primary readout.** grn_real trails baseline and PCA at every condition. The
-   inductive bias costs more (each hidden unit sees only its regulon) than the biology it adds.
-2. **The decisive corruption test is negative at full data.** grn_real (0.699) does **not** beat
-   its same-density controls: sign-shuffled ties it (0.699) and **random is higher (0.731)**. So
-   the *specific* DoRothEA biology adds nothing over a random graph of the same density — what
-   little the mask does is explained by sparsity, not regulatory content.
-3. **A faint, honestly-reported structural signal — and density is the bigger lever.** Real vs
-   rewired shows some biologically-relevant structure survives (full-data and noise, ~0.02–0.05),
-   but the density ablation makes clear that most of what improves the prior is *sparsity*: the
-   A-subset ≈ baseline, yet a rewired A-graph matches it, and under low data the rewired graph is
-   best. So the specific regulatory topology is a minor factor; graph *density/regularization*
-   dominates, and neither beats the baseline.
-4. **Biology vs batch.** Cell type (a strong, largely linear signal — PCA tops the table) is
-   captured best by the *least* constrained methods; disease (confounded) by none. The prior buys
-   neither better biology nor lower donor leakage.
-
-## Why the prior likely didn't help here
-- Cell-type identity in PBMC is high-variance and near-linear; PCA already nails it, leaving no
-  gap for a regulatory inductive bias to fill.
-- Pseudobulk averaging already removes most technical noise, shrinking the regularization
-  advantage a prior might offer on raw single cells.
-- A **hard mask + fixed sign** is a rigid encoding of the prior: it discards capacity and forces
-  activation/repression directions that may be noisy in DoRothEA (esp. C-confidence edges). A
-  *soft* prior (graph-Laplacian penalty, graph init, or GNN message passing) might behave better
-  and is untested here.
+## Related work (context)
+This matches a clear recent pattern: biology-wired networks rarely beat strong simple baselines on
+accuracy, and reported gains often reflect capacity/regularization or dimensionality rather than
+biology. Plain logistic regression matches scBERT on cell typing (Nat Mach Intell 2024); *"one PCA
+still rules them all"* for perturbation prediction (Nat Methods 2025); biologically-informed
+decoders (expiMap, Nat Cell Biol 2023; P-NET, Nature 2021) are framed as **interpretability**, not
+accuracy, wins; and randomly-wired biological nets often match knowledge-primed ones — which is why
+a shuffled/rewired-graph control is the demanded ablation (Kong et al. 2023). Biologically-informed
+nets help mainly under small samples / weak signal (2025), consistent with our low-data result.
+The canonical *successful* use of DoRothEA is exactly ours: decoupler ULM TF-activity (SCENIC/
+AUCell lineage, Nat Methods 2017), now often superseded by CollecTRI (NAR 2023). Notably, Arc's
+"virtual cell" STATE model uses no GRN prior at all. Our donor-held-out design addresses the
+pseudoreplication/donor-confound pitfall central to between-subjects disease scRNA-seq
+(Squair et al., Nat Commun 2021).
 
 ## Limitations
-Single dataset; n=500 pseudobulk; disease confounded with donor; 2 seeds; no hyperparameter
-search; one prior-encoding (hard mask) of many; probes limited to logistic/kNN. The density
-ablation used one low-data / noise point each rather than a full grid.
+Single primary dataset (COVID as replication); n=500 pseudobulk; RA disease confounded with donor;
+5 seeds; one encoder family; probes = logistic/kNN; TF-activity dims differ by network (293 vs 675)
+so the CollecTRI arm is not dimension-matched to DoRothEA; no formal HPO (by design — see below).
 
-## What would make the experiment biologically stronger
-- A readout that is genuinely *regulatory* (predict perturbation response or measured TF activity)
-  rather than cell-type identity, which linear methods already solve.
-- **Within-subjects** perturbation data, so biological state is not aliased with donor.
-- Multiple datasets + assays for external validity; sweep DoRothEA confidence/density; test a
-  **soft** graph prior (Laplacian reg / GNN) as an alternative to the hard mask.
+## On hyperparameter optimization
+Deliberately none. The brief states peak performance is not the goal; all models share
+architecture/budget *by design*, so tuning one more than another would break the fairness that
+makes the comparison valid (scIB's benchmark likewise used defaults). Instead we swept prior
+strength (soft-λ), ran 5 seeds for variance, and used matched-dimension and rewired controls — the
+robustness checks that actually guard the conclusion. A bottleneck-dim sensitivity sweep (32/64/128)
+is the one cheap extension that would further rule out a tuning artifact.
+
+## What would make it biologically stronger
+A genuinely *regulatory* readout (perturbation response or measured TF activity) rather than
+cell-type identity, which linear methods already solve; **within-subjects** perturbation data so
+state isn't aliased with donor; more datasets/assays; and a soft/GNN prior evaluated specifically
+in the low-data regime where the transform already shows a benefit.
 
 ## What I deliberately left out (48h scope)
-Raw single-cell modeling; STATE/metabolic/pathway priors (out of scope); GNN (masked-MLP was the
-primary, pure-torch choice); hyperparameter search; backup datasets. I prioritized a *fair,
-capacity-matched* baseline-vs-prior-vs-corruption comparison (plus a density ablation with
-rewired controls) on one readout over broad but shallow coverage.
+Raw single-cell modeling; STATE/metabolic/pathway priors (out of scope); a full GNN (masked-MLP +
+soft penalty covered the "learned prior" family); formal HPO; a bottleneck-dim sweep. I prioritized
+a fair, controlled comparison of *how the prior is applied* (constraint vs transform), with
+corruption, matched-dimension, and second-dataset controls, over broad but shallow coverage.

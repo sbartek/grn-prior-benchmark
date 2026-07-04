@@ -1,0 +1,17 @@
+/Users/barteks/workai/projects/grn-prior-benchmark/.venv/lib/python3.11/site-packages/legacy_api_wrap/__init__.py:88: FutureWarning: The dtype argument is deprecated and will be removed in late 2024.
+  return fn(*args_all, **kw)
+[qc] 1934 groups; 1411 kept (>= 10 cells), 523 dropped
+[ok] pseudobulk: 1411 samples x 26269 genes
+     donors=75 cell_types=28
+     cells/group: min=10 median=88 max=8644
+[write] data/covid_pseudobulk.h5ad (236.9 MB)
+[graph] input genes=8991  TFs(hidden)=422  edges(ABC)=31689
+  real           edges= 32095  density=0.0085
+  real_A         edges=  6262  density=0.0017
+  real_AB        edges= 15184  density=0.0040
+  rewired_A      edges=  5977  density=0.0016
+  rewired_AB     edges= 14192  density=0.0037
+  rewired        edges= 30201  density=0.0080
+  sign_shuffled  edges= 32095  density=0.0085
+  random         edges= 31954  density=0.0084
+[write] data/covid_graph.npz (0.6 MB)
