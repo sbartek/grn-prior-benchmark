@@ -24,29 +24,28 @@ def _thin_counts(counts, p, rng):
     return np.log1p(thinned / lib * 1e4)
 
 
-_DOR_NET = None
+_NETS = {}
 
 
-def _dorothea_net():
-    global _DOR_NET
-    if _DOR_NET is None:
+def _net(name):
+    if name not in _NETS:
         import decoupler as dc
-        _DOR_NET = dc.op.dorothea(organism="human")
-    return _DOR_NET
+        _NETS[name] = getattr(dc.op, name)(organism="human")
+    return _NETS[name]
 
 
-def compute_tfact_mat(X, genes):
+def compute_tfact_mat(X, genes, net="dorothea"):
     """decoupler ULM TF-activity for an expression matrix (per-sample, fixed GRN transform)."""
     import anndata as ad
     import decoupler as dc
     A = ad.AnnData(np.asarray(X).copy())
     A.var_names = list(genes)
-    dc.mt.ulm(A, net=_dorothea_net(), tmin=5, verbose=False)
+    dc.mt.ulm(A, net=_net(net), tmin=5, verbose=False)
     return np.asarray(A.obsm["score_ulm"])
 
 
-def compute_tfact(data):
-    return compute_tfact_mat(data["X"], data["genes"])
+def compute_tfact(data, net="dorothea"):
+    return compute_tfact_mat(data["X"], data["genes"], net=net)
 
 
 def make_embedder(spec, data, train_idx, device, seed, epochs, X_input):
@@ -71,6 +70,18 @@ def make_embedder(spec, data, train_idx, device, seed, epochs, X_input):
         from sklearn.decomposition import PCA           # dimension-matched control (64-d)
         k = min(64, len(train_idx) - 1, tf.shape[1])
         return PCA(n_components=k, random_state=seed).fit(tf[train_idx]).transform(tf)
+
+    if spec == "dc_tfact_collectri":
+        # second TF-activity arm (CollecTRI net) — is the ULM win DoRothEA-specific or generic?
+        return data["tfact_collectri"] if X_input is data["X"] \
+            else compute_tfact_mat(X_input, genes, net="collectri")
+
+    if spec == "rand_proj":
+        # matched-dimension RANDOM linear features (same dim as TF-activity). Fixed transform.
+        # If this matches dc_tfact, the TF-activity gain is dimensionality, not biology.
+        k = data["tfact"].shape[1]
+        R = np.random.default_rng(12345).standard_normal((n_genes, k)).astype(np.float32) / np.sqrt(k)
+        return X_input @ R
 
     # soft prior: dense first layer + penalty pulling off-regulon weights to 0 (spec 'grn_soft[:lam]')
     soft_mask = None
