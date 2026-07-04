@@ -53,7 +53,7 @@ check the master books out, you photocopy the page you need.
 
 Hold onto that last line — it's the reason this whole field exists.
 
-🎥 *Optional:* [Amoeba Sisters — DNA vs RNA](https://www.youtube.com/watch?v=k6iE10Xe2Ws) (7 min)
+🎥 *Optional:* [Amoeba Sisters — DNA vs RNA (Updated)](https://www.youtube.com/watch?v=JQByjprj_mA) (~8 min)
 
 ---
 
