@@ -75,10 +75,47 @@ def bar_density():
     fig.tight_layout(); fig.savefig(FIG / "fig_density.png", dpi=130); plt.close(fig)
 
 
+def grouped_bar(csv, order, conds, title, fname, ylim=(0, 1.0), task=None):
+    p = TAB / csv
+    if not p.exists():
+        return
+    dd = pd.read_csv(p)
+    if task is not None and "task" in dd.columns:
+        dd = dd[dd.task == task]
+    fig, ax = plt.subplots(figsize=(12, 4.4))
+    w = 0.8 / len(order)
+    for j, m in enumerate(order):
+        s = dd[dd.model == m].set_index("condition").reindex(conds)
+        ax.bar(np.arange(len(conds)) + j * w, s["mean"], w, yerr=s.get("std"),
+               label=m, capsize=2)
+    ax.set_xticks(np.arange(len(conds)) + 0.4 - w / 2); ax.set_xticklabels(conds)
+    ax.set_ylabel("cell-type macro-F1"); ax.set_ylim(*ylim); ax.set_title(title)
+    ax.legend(fontsize=8, ncol=4, loc="lower center")
+    fig.tight_layout(); fig.savefig(FIG / fname, dpi=130); plt.close(fig)
+
+
+def round2_and_covid():
+    grouped_bar("round2.csv",
+                ["pca", "baseline", "dc_tfact", "dc_tfact_pca", "grn_soft:0.001", "grn_real"],
+                ["full", "lowdata:4", "lowdata:8", "lowdata:16", "noise:0.3", "noise:0.1"],
+                "Round 2 (primary): TF-activity vs learned encoders", "fig_round2.png")
+    covid_models = ["pca", "baseline", "dc_tfact", "dc_tfact_pca", "grn_soft:0.001", "grn_real", "grn_rewired"]
+    grouped_bar("covid.csv", covid_models, ["full", "lowdata:8", "noise:0.3"],
+                "COVID PBMC — cell type: same verdict", "fig_covid.png", task="cell_type")
+    grouped_bar("covid.csv", covid_models, ["full", "lowdata:8", "noise:0.3"],
+                "COVID PBMC — disease (3-class): PCA best; GRN≈rewired", "fig_covid_disease.png",
+                task="disease", ylim=(0, 0.8))
+    grouped_bar("dimcheck.csv",
+                ["baseline", "pca", "dc_tfact_pca", "rand_proj", "dc_tfact", "dc_tfact_collectri"],
+                ["full", "lowdata:8", "noise:0.3"],
+                "Dimensionality vs biology: 64-d refs vs 293/675-d arms", "fig_dimcheck.png")
+
+
 if __name__ == "__main__":
     bar_full()
     line_condition("lowdata:", "# train donors", "fig_lowdata.png", int)
     line_condition("noise:", "counts kept (thinning p)", "fig_noise.png", float)
     bar_leakage()
     bar_density()
-    print("[figures] wrote fig_full, fig_lowdata, fig_noise, fig_leakage, fig_density")
+    round2_and_covid()
+    print("[figures] wrote fig_full, fig_lowdata, fig_noise, fig_leakage, fig_density, fig_round2, fig_covid")
