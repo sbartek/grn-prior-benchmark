@@ -190,6 +190,41 @@ improve rigor. Instead: prior-strength is already swept (soft-λ), 5 seeds quant
 a small **bottleneck-dim sensitivity** check (32/64/128, baseline vs GRN vs tfact) is the right
 lightweight robustness move if time — it also further addresses the tfact dimensionality caveat.
 
+## 14. Critical review (2026-07-04) — findings & fix plan
+
+Adversarial self-review (methodology critic + code critic). Prioritized:
+
+**BLOCKERS (fixing):**
+- **B1 — Seeds don't re-draw folds.** `GroupKFold` is deterministic → all "5 seeds" share one
+  donor partition (deterministic models show std=0). Error bars capture only AE-init jitter, not
+  fold variance. *Fix:* `GroupShuffleSplit`/permute donors per seed; re-run sweeps.
+- **B2 — Paired deltas pseudoreplicated** (n=25 = 5×5 but folds identical → effective n≈5).
+  *Fix:* stats over folds/donors, not 25.
+- **B3 — No rewired-*network* TF-activity control (biggest scientific gap).** Transform null is
+  only `rand_proj` (dense Gaussian); the demanded null (by our own encoder logic) is **ULM on a
+  rewired/sign-shuffled DoRothEA net**. *Fix:* add `dc_tfact_rewired`; compare to `dc_tfact`.
+
+**SHOULD-FIX:**
+- **S4 — Baseline AE < PCA everywhere (0.79 vs 0.86)** → "constraint hurts" conditioned on an
+  under-trained encoder. *Fix:* strengthen AE (batchnorm/wider/longer) to ≈PCA, or frame as
+  "relative to this AE."
+- **S5 — "grn_real ≈ rewired ≈ random" imprecise** (random highest 0.731). *Fix:* reword to
+  "corrupted graphs do as well or better."
+- **S6 — "beats PCA under low-data" narrow** (ties by k=16; k=4 win partly PCA rank-starvation).
+  *Fix:* show full k-sweep, state it vanishes.
+- **S7 — macro-F1 lacks fixed `labels=`** → folds average over different class sets. *Fix:* pass
+  global 15-class `labels=`.
+- **S8 — "5 seeds" false for several tables** (results/density/covid n=2; leakage no CIs). *Fix:*
+  rerun at consistent seeds or state per-table.
+
+**NICE-TO-HAVE:** N9 soft-prior = structured weight-decay (≠ hard-mask operator); N10
+"capacity-matched" is nominal not effective (lean on rewired control); N11 `rand_proj` hardcoded
+seed; memo length (~3pp vs ~2); add `references.md` with URLs; reference figures in memo; state
+disease chance level; one scIB-style non-probe metric.
+
+**Credited as correct:** TF-activity path leakage-clean; encoder retrained per fold; rewired
+encoder control present.
+
 ## 12. Living-documentation protocol (update after EVERY step)
 
 After completing each execution step above, before moving on:
