@@ -82,10 +82,19 @@ def build_mask(graph: dict, name: str, genes_order: np.ndarray, n_hidden: int, d
     return (torch.tensor(mask, device=device), torch.tensor(sign, device=device))
 
 
-def train_ae(model, X, val_idx, device, epochs=300, lr=1e-3, wd=1e-4, patience=30, verbose=False):
-    """Train an autoencoder with early stopping on held-out reconstruction MSE."""
+def train_ae(model, X, val_idx, device, epochs=300, lr=1e-3, wd=1e-4, patience=30,
+             soft_mask=None, soft_lambda=0.0, verbose=False):
+    """Train an autoencoder with early stopping on held-out reconstruction MSE.
+
+    soft_mask/soft_lambda: SOFT graph prior. On a dense first layer, add a penalty
+    soft_lambda * ||W ⊙ (1 - mask)||^2 that shrinks off-regulon weights toward zero without
+    removing them. soft_lambda=0 -> baseline; soft_lambda->inf -> approaches the hard mask.
+    """
     model = model.to(device)
     X = torch.tensor(np.asarray(X), dtype=torch.float32, device=device)
+    if soft_mask is not None:
+        soft_mask = soft_mask.to(device)
+        off = 1.0 - soft_mask
     n = X.shape[0]
     mask_val = torch.zeros(n, dtype=torch.bool, device=device)
     mask_val[val_idx] = True
@@ -98,6 +107,8 @@ def train_ae(model, X, val_idx, device, epochs=300, lr=1e-3, wd=1e-4, patience=3
         opt.zero_grad()
         recon, _ = model(Xtr)
         loss = F.mse_loss(recon, Xtr)
+        if soft_lambda > 0 and soft_mask is not None:
+            loss = loss + soft_lambda * (model.enc1.weight * off).pow(2).sum()
         loss.backward()
         opt.step()
         model.eval()
