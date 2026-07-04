@@ -24,6 +24,16 @@ def _thin_counts(counts, p, rng):
     return np.log1p(thinned / lib * 1e4)
 
 
+def compute_tfact(data):
+    """decoupler ULM TF-activity of the pseudobulk (a fixed, per-sample GRN transform)."""
+    import anndata as ad
+    import decoupler as dc
+    A = ad.AnnData(data["X"].copy())
+    A.var_names = list(data["genes"])
+    dc.mt.ulm(A, net=dc.op.dorothea(organism="human"), tmin=5, verbose=False)
+    return np.asarray(A.obsm["score_ulm"])
+
+
 def make_embedder(spec, data, train_idx, device, seed, epochs, X_input):
     """Train the encoder on train_idx and return embeddings for ALL samples."""
     torch_seed(seed)
@@ -32,7 +42,8 @@ def make_embedder(spec, data, train_idx, device, seed, epochs, X_input):
 
     if spec == "pca":
         from sklearn.decomposition import PCA
-        p = PCA(n_components=64, random_state=seed).fit(X_input[train_idx])
+        k = min(64, len(train_idx) - 1, X_input.shape[1])
+        p = PCA(n_components=k, random_state=seed).fit(X_input[train_idx])
         return p.transform(X_input)
 
     if spec == "dc_tfact":

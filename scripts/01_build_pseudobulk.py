@@ -13,9 +13,11 @@ import numpy as np
 import scanpy as sc
 from scipy import sparse
 
+import sys
+
 ROOT = Path(__file__).resolve().parents[1]
-IN = ROOT / "data" / "raw.h5ad"
-OUT = ROOT / "data" / "pseudobulk.h5ad"
+IN = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / "data" / "raw.h5ad"
+OUT = Path(sys.argv[2]) if len(sys.argv) > 2 else ROOT / "data" / "pseudobulk.h5ad"
 
 MIN_CELLS = 10          # drop (donor x cell_type) groups smaller than this
 MIN_GROUP_GENES = 1     # keep genes expressed in >=1 pseudobulk sample
