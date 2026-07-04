@@ -33,13 +33,16 @@ def main():
     data["tfact"] = compute_tfact(data)
     print(f"[covid] X={data['X'].shape} tfact={data['tfact'].shape} "
           f"donors={data['obs'].donor_id.nunique()} cell_types={data['obs'].cell_type.nunique()}")
+    # COVID has 3 disease states across 75 donors (still between-subjects, but less degenerate
+    # than the primary RA data's 2-class fully-donor-confounded design).
     rows = []
-    for cond in CONDITIONS:
-        for m in MODELS:
-            scores = run_cv(data, m, "cell_type", cond, dev, SEEDS, epochs=250)
-            rows.append(dict(model=m, condition=cond, task="cell_type",
-                             mean=float(np.mean(scores)), std=float(np.std(scores))))
-            print(f"  {m:16s} {cond:10s} F1={np.mean(scores):.3f}±{np.std(scores):.3f}")
+    for task in ["cell_type", "disease"]:
+        for cond in CONDITIONS:
+            for m in MODELS:
+                scores = run_cv(data, m, task, cond, dev, SEEDS, epochs=250)
+                rows.append(dict(model=m, condition=cond, task=task,
+                                 mean=float(np.mean(scores)), std=float(np.std(scores))))
+                print(f"  {task:9s} {m:16s} {cond:10s} F1={np.mean(scores):.3f}±{np.std(scores):.3f}")
     pd.DataFrame(rows).to_csv(ROOT / "results" / "tables" / "covid.csv", index=False)
     print("[done]")
 

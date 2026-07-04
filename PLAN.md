@@ -170,6 +170,26 @@ https://sbartek.github.io/grn-prior-benchmark/** (verified HTTP 200). Docs also 
 markdown on github.com, and `mkdocs serve` works locally.
 *(Historical caveat: private repos need GitHub Pro/Team for Pages — moot now that it's public.)*
 
+## 13. Round-2 extensions (user-requested, 2026-07-04)
+
+- **A1 soft prior** (`grn_soft:<λ>`): dense encoder + penalty shrinking off-regulon weights.
+  Result: more prior = worse; never beats baseline. The failure isn't mask *hardness*.
+- **A2 TF-activity** (`dc_tfact`, decoupler ULM): the canonical fixed GRN transform. Beats the
+  baseline at full + low-data; competitive with PCA. **Caveat:** 293-d vs 64-d → added
+  `dc_tfact_pca` (→PCA-64); at matched dim it ≈ baseline, so part of the edge is dimensionality.
+- **A3 stats**: 5 seeds, paired baseline-vs-model deltas across (seed, fold). Also caught+fixed a
+  fairness bug (TF-activity under noise was using clean data).
+- **B4 second dataset** (COVID PBMC, 422k cells, 75 donors, 28 cell types, **3 disease states**):
+  same ordering replicates → verdict not RA-specific. Disease added as a 3-class readout
+  (less degenerate than RA's 2-class fully-donor-confounded disease).
+
+### On hyperparameter optimization (HPO)
+**Decision: no formal HPO.** The brief says "we are not looking for peak performance"; all models
+share architecture/budget *by design*, so tuning one more than another would break fairness, not
+improve rigor. Instead: prior-strength is already swept (soft-λ), 5 seeds quantify variance, and
+a small **bottleneck-dim sensitivity** check (32/64/128, baseline vs GRN vs tfact) is the right
+lightweight robustness move if time — it also further addresses the tfact dimensionality caveat.
+
 ## 12. Living-documentation protocol (update after EVERY step)
 
 After completing each execution step above, before moving on:
