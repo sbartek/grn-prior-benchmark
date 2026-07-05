@@ -46,7 +46,38 @@ GPT = 4            # 4 target genes each
 N_GENES = N_TF * GPT           # 12 genes
 gene_tf = np.repeat(np.arange(N_TF), GPT)   # TRUE graph: gene -> which TF regulates it
 print("true graph (gene -> TF):", gene_tf)
-print(f"{N_GENES} genes, {N_TF} TFs, each TF regulates {GPT} genes")
+print(f"{N_GENES} genes, {N_TF} TFs, each TF regulates {GPT} genes -> {N_GENES} edges")
+
+# %% [markdown]
+# ## The toy gene-regulatory graph
+# A tiny bipartite network: **3 TFs (left)** each wired to **4 target genes (right)** — 12 edges,
+# every gene regulated by exactly one TF. (The real DoRothEA graph is ~411 TFs × 8,376 genes with
+# ~30,000 *signed* edges and overlapping regulons; this is the readable cartoon of it.)
+
+# %%
+import plotly.graph_objects as go
+
+tf_y = np.linspace(0, 1, N_TF)
+gene_y = np.linspace(0, 1, N_GENES)
+ex, ey = [], []
+for g in range(N_GENES):
+    ex += [0, 1, None]
+    ey += [tf_y[gene_tf[g]], gene_y[g], None]
+
+PAL = ["#e41a1c", "#377eb8", "#4daf4a"]              # one colour per TF
+fig = go.Figure()
+fig.add_trace(go.Scatter(x=ex, y=ey, mode="lines", line=dict(color="lightgray", width=1),
+                         hoverinfo="none", showlegend=False))
+fig.add_trace(go.Scatter(x=[0] * N_TF, y=tf_y, mode="markers+text",
+                         text=[f"TF{t}" for t in range(N_TF)], textposition="middle left",
+                         marker=dict(size=30, color=[PAL[t] for t in range(N_TF)]), name="TFs"))
+fig.add_trace(go.Scatter(x=[1] * N_GENES, y=gene_y, mode="markers+text",
+                         text=[f"g{g}" for g in range(N_GENES)], textposition="middle right",
+                         marker=dict(size=16, color=[PAL[t] for t in gene_tf]), name="genes"))
+fig.update_layout(title="toy GRN: TF → target-gene edges (genes coloured by regulating TF)",
+                  height=460, width=560, xaxis=dict(visible=False, range=[-0.25, 1.25]),
+                  yaxis=dict(visible=False))
+fig
 
 # %% [markdown]
 # ## The generative story (the "biology" we control)
@@ -82,6 +113,52 @@ fig = px.imshow(X[order], aspect="auto", color_continuous_scale="RdBu_r", zmin=-
                 title="raw expression — 12 genes (noisy)")
 fig.update_layout(height=420, width=620)
 fig
+
+# %% [markdown]
+# ## From single cells to pseudobulk
+# Real scRNA-seq is measured per **single cell**, which is extremely noisy (dropout). We don't model
+# single cells — we **pseudobulk**: average all cells of the same *(donor × cell type)* into one
+# clean profile. Here we simulate 6 donors, each with noisy single cells of all 3 types, then
+# aggregate. Watch the block structure emerge as the single-cell noise washes out.
+
+# %%
+from plotly.subplots import make_subplots
+
+n_donors, cells_per, sc_noise = 6, 40, 3.0
+r = np.random.default_rng(7)
+cells, dmeta = [], []
+for d in range(n_donors):
+    for k in range(N_TF):                       # each donor has cells of every type
+        sig = (gene_tf == k) * 2.0
+        cells.append(sig + r.normal(0, sc_noise, (cells_per, N_GENES)))
+        dmeta += [(d, k)] * cells_per
+cells = np.vstack(cells)
+dmeta = pd.DataFrame(dmeta, columns=["donor", "type"])
+pb = (pd.DataFrame(cells, columns=[f"g{i}" for i in range(N_GENES)])
+      .assign(donor=dmeta.donor, type=dmeta.type)
+      .groupby(["donor", "type"]).mean())      # pseudobulk = mean of cells per (donor, type)
+print(f"single cells: {cells.shape[0]}   ->   pseudobulk profiles: {pb.shape[0]} "
+      f"(= {n_donors} donors x {N_TF} types)")
+
+# %%
+sc_order = np.argsort(dmeta.type.values)
+pb_sorted = pb.reset_index().sort_values("type")
+fig = make_subplots(rows=1, cols=2, column_widths=[0.62, 0.38],
+                    subplot_titles=(f"{cells.shape[0]} single cells (very noisy)",
+                                    f"{pb.shape[0]} pseudobulk profiles (clean)"))
+fig.add_trace(go.Heatmap(z=cells[sc_order], colorscale="RdBu", reversescale=True, zmid=0, zmin=-4, zmax=4,
+                         showscale=False), 1, 1)
+fig.add_trace(go.Heatmap(z=pb_sorted[[f"g{i}" for i in range(N_GENES)]].values,
+                         colorscale="RdBu", reversescale=True, zmid=0, zmin=-2, zmax=2, showscale=False), 1, 2)
+fig.update_layout(height=440, width=900,
+                  title="pseudobulk (donor × type averaging) washes out single-cell noise")
+fig.update_xaxes(title_text="gene"); fig.update_yaxes(showticklabels=False)
+fig
+
+# %% [markdown]
+# The 720 single cells on the left are a mess; the 18 pseudobulk profiles on the right show clean
+# 3-block structure. **This averaging is step 1 of denoising — done *before* any model.** The
+# graph-aware transform below is a *second* averaging, this time along the regulatory graph.
 
 # %% [markdown]
 # ## The four representations
