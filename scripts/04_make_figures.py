@@ -94,6 +94,26 @@ def grouped_bar(csv, order, conds, title, fname, ylim=(0, 1.0), task=None):
     fig.tight_layout(); fig.savefig(FIG / fname, dpi=130); plt.close(fig)
 
 
+def final_headline():
+    p = TAB / "final.csv"
+    if not p.exists():
+        return
+    dd = pd.read_csv(p)
+    order = ["pca", "baseline", "grn_real", "grn_rewired", "grn_soft:0.001",
+             "rand_proj", "dc_tfact_rewired", "dc_tfact", "dc_tfact_collectri"]
+    conds = ["full", "lowdata:4", "lowdata:8", "lowdata:16", "noise:0.3", "noise:0.1"]
+    fig, ax = plt.subplots(figsize=(13, 4.6))
+    w = 0.8 / len(order)
+    for j, m in enumerate(order):
+        s = dd[dd.model == m].set_index("condition").reindex(conds)
+        ax.bar(np.arange(len(conds)) + j * w, s["mean"], w, yerr=s["std"], label=m, capsize=1.5)
+    ax.set_xticks(np.arange(len(conds)) + 0.4 - w / 2); ax.set_xticklabels(conds)
+    ax.set_ylabel("cell-type macro-F1"); ax.set_ylim(0, 0.95)
+    ax.set_title("Definitive sweep (post-review): constraint hurts; TF-activity beats rewired-net & wins under low-data")
+    ax.legend(fontsize=8, ncol=5, loc="lower center")
+    fig.tight_layout(); fig.savefig(FIG / "fig_final.png", dpi=130); plt.close(fig)
+
+
 def bottleneck():
     p = TAB / "bottleneck.csv"
     if not p.exists():
@@ -137,4 +157,5 @@ if __name__ == "__main__":
     bar_density()
     round2_and_covid()
     bottleneck()
+    final_headline()
     print("[figures] wrote fig_full, fig_lowdata, fig_noise, fig_leakage, fig_density, fig_round2, fig_covid")

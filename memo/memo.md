@@ -10,9 +10,10 @@ and does any benefit hold up under low-data, noise, and graph corruption?
   below PCA and a plain autoencoder — and a degree-preserving **rewired** graph does as well,
   so what little it offers is regularization, not the specific biology.
 - As a **fixed feature transform** (decoupler ULM TF-activity, the classical use): it carries
-  **real** biological signal — it beats a **matched-dimension random projection** everywhere —
-  and it **beats PCA and the baseline in the low-data regime** (where priors are supposed to
-  help). At full data it merely ties PCA; under noise it ties the baseline.
+  **real** biological signal — it beats **both** a rewired-network TF-activity control *and* a
+  matched-dimension random projection (real 0.847 > rewired-net 0.804 > random 0.775) — and it
+  **beats PCA and the baseline in the low-data regime** (where priors are supposed to help). At
+  full data it merely ties PCA; under heavy noise it fades to the baseline.
 - The effect is **not DoRothEA-specific** (CollecTRI reproduces and slightly exceeds it) and
   **replicates on a second dataset** (COVID PBMC). Disease is decodable on the 3-class COVID data
   (PCA best) but not on the fully donor-confounded 2-class RA data.
@@ -25,9 +26,10 @@ doing nothing.
 CELLxGENE RA PBMC (`d18736c3…`, 108,717 cells) → **pseudobulk by (donor × cell_type)**, 536
 groups → **500 kept** (≥10 cells), CP10K+log1p, restricted to the 8,376 genes shared with
 DoRothEA. Readouts: **cell type** (15 classes, primary) and **disease** (secondary). All scoring
-is **donor-grouped 5-fold CV** with the encoder retrained on train donors *inside* each fold — so
-neither encoder nor probe ever sees a held-out donor. Metric: macro-F1 (mean over 5 seeds; paired
-deltas computed at matched (seed, fold)).
+is **donor-grouped 5-fold CV**, with folds **re-shuffled per seed** (so each of the 5 seeds is a
+genuine re-partition, not the same split) and the encoder retrained on train donors *inside* each
+fold — neither encoder nor probe ever sees a held-out donor. Metric: macro-F1 with a **fixed
+15-class label set** (comparable across folds); paired deltas over the 25 (seed×fold) splits.
 
 ## Is the dataset suitable?
 Balanced **18 RA / 18 normal**, **no sex confound** (12F/6M both arms), **single assay** (10x 3′
@@ -45,38 +47,41 @@ between-subjects, but less degenerate, and there disease *is* decodable.)
   dimension-matched), `dc_tfact_collectri` (CollecTRI net, 675-d).
 - **Null**: `rand_proj` (random linear features at the TF-activity dimension).
 
-## Results (cell-type macro-F1)
+## Results (cell-type macro-F1, definitive post-review sweep — `final.csv`, 5 seeds, per-seed folds)
 
 | model (dim) | full | lowdata k=8 | noise p=0.3 |
 |---|---|---|---|
-| PCA (64) | 0.862 | 0.653 | **0.769** |
-| baseline AE (64) | 0.794 | 0.640 | 0.733 |
-| **dc_tfact** (293) | **0.864** | **0.691** | 0.730 |
-| **dc_tfact_collectri** (675) | 0.858 | **0.740** | **0.779** |
-| dc_tfact_pca (64) | 0.793 | 0.633 | 0.685 |
-| rand_proj (293) | 0.767 | 0.627 | 0.640 |
-| grn_soft:0.001 | 0.754 | 0.637 | 0.721 |
-| grn_real (hard mask) | 0.714 | 0.569 | 0.597 |
-| grn_soft:0.01 | 0.619 | 0.498 | 0.661 |
+| PCA (64) | **0.869** | 0.632 | 0.770 |
+| baseline AE (64) | 0.785 | 0.661 | 0.733 |
+| **dc_tfact** — DoRothEA ULM (293) | 0.847 | 0.686 | 0.720 |
+| **dc_tfact_rewired** — *rewired net* (293) | 0.804 | 0.661 | 0.703 |
+| rand_proj — *random* (293) | 0.775 | 0.624 | 0.648 |
+| **dc_tfact_collectri** (675) | **0.869** | **0.746** | **0.784** |
+| dc_tfact_pca (64) | 0.783 | 0.630 | 0.686 |
+| grn_soft:0.001 | 0.753 | 0.641 | 0.715 |
+| grn_real (hard mask) | 0.714 | 0.591 | 0.615 |
+| grn_rewired / grn_random (full) | 0.665 / 0.754 | – | – |
 
 **Reading it:**
-1. **GRN-as-constraint hurts.** `grn_real` and `grn_soft` trail both PCA and the baseline
-   everywhere; *more* prior is *worse* (soft 0.001 > soft 0.01 > hard). The problem isn't mask
+1. **GRN-as-constraint hurts.** `grn_real`/`grn_soft` trail both PCA and the baseline everywhere;
+   *more* prior is *worse* (soft 0.001 0.75 > soft 0.01 0.62 > hard 0.71). The problem isn't mask
    hardness — it's imposing the graph on the encoder at all.
-2. **The corruption test kills the "it's biology" story for the constraint.** At matched density
-   `grn_real` ≈ `grn_rewired` ≈ `grn_random` (and a **density ablation** shows the same: a
-   high-confidence A-subset ≈ baseline, but a rewired-A graph matches it). Any constraint benefit
-   is sparsity/regularization, not regulatory content.
-3. **The transform is different — biology is real there.** `dc_tfact` (293-d) beats the
-   **matched-dimension random projection** `rand_proj` (293-d) in every condition (+0.06–0.10),
-   so the DoRothEA weights carry genuine cell-type signal beyond dimensionality.
-4. **…but it doesn't beat a strong simple baseline except when data is scarce.** At full data
-   `dc_tfact` ≈ PCA (0.864 vs 0.862, using 4× the dimensions); under **low data** it clearly beats
-   PCA and baseline (0.691 / CollecTRI 0.740 vs 0.653), the classic small-data regularization win;
-   under noise it ties the baseline. `dc_tfact_pca` (dimension-matched) ≈ baseline — the full-rep
-   advantage needs the extra dimensions.
-5. **Not prior-specific.** CollecTRI ≥ DoRothEA (notably under low-data/noise) → the effect is a
-   property of "TF-activity as a transform," and a broader/better network helps more.
+2. **The corruption test kills the "it's biology" story for the constraint.** At full data
+   `grn_random` (0.754) actually tops `grn_real` (0.714) and `grn_rewired` (0.665) — corrupted
+   graphs do as well or better, so any constraint benefit is sparsity/regularization.
+3. **The transform is different — and now doubly-controlled.** `dc_tfact` (0.847) beats **both**
+   the rewired-DoRothEA-net TF-activity `dc_tfact_rewired` (0.804) *and* the random projection
+   `rand_proj` (0.775). Real regulons > rewired regulons > random ⇒ the signal is the *specific*
+   regulatory structure, not just sparsity or dimensionality. (This rewired-net null was the
+   control the earlier draft lacked.)
+4. **It helps most when data is scarce.** At full data `dc_tfact` ≈ PCA; under **low data** TF-
+   activity clearly beats baseline and PCA (CollecTRI beats the baseline in **96–100 %** of folds;
+   see `final_stats.csv`), and there `dc_tfact` > `dc_tfact_rewired` — biology, not structure.
+   Under heavy noise `dc_tfact` fades below the baseline while CollecTRI holds.
+5. **Not prior-specific.** CollecTRI ≥ DoRothEA in every condition → the effect is a property of
+   "TF-activity as a transform," and a broader/better network helps more.
+
+![headline](../results/figures/fig_final.png)
 
 **Disease.** On RA (2-class, fully donor-confounded) nothing decodes disease from held-out donors
 (≈ chance). On **COVID (3-class, 75 donors)** disease *is* decodable — PCA best (0.715), then
@@ -140,6 +145,7 @@ in the low-data regime where the transform already shows a benefit.
 
 ## What I deliberately left out (48h scope)
 Raw single-cell modeling; STATE/metabolic/pathway priors (out of scope); a full GNN (masked-MLP +
-soft penalty covered the "learned prior" family); formal HPO; a bottleneck-dim sweep. I prioritized
-a fair, controlled comparison of *how the prior is applied* (constraint vs transform), with
-corruption, matched-dimension, and second-dataset controls, over broad but shallow coverage.
+soft penalty covered the "learned prior" family); formal HPO (a bottleneck-dim *sensitivity* sweep
+is included instead). I prioritized a fair, controlled comparison of *how the prior is applied*
+(constraint vs transform), with corruption, matched-dimension, bottleneck-sensitivity, and
+second-dataset controls, over broad but shallow coverage.
