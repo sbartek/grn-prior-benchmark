@@ -62,7 +62,7 @@ def compute_tfact(data, net="dorothea"):
     return compute_tfact_mat(data["X"], data["genes"], net=net)
 
 
-def make_embedder(spec, data, train_idx, device, seed, epochs, X_input, z_dim=64):
+def make_embedder(spec, data, train_idx, device, seed, epochs, X_input, z_dim=64, early_stop=True):
     """Train the encoder on train_idx and return embeddings for ALL samples."""
     torch_seed(seed)
     genes, tfs = data["genes"], data["tfs"]
@@ -120,10 +120,14 @@ def make_embedder(spec, data, train_idx, device, seed, epochs, X_input, z_dim=64
     model = M.AutoEncoder(n_genes, n_hidden, z_dim, mask=mask, sign=sign)
 
     rng = np.random.default_rng(seed)
-    val = rng.choice(train_idx, size=max(2, int(0.15 * len(train_idx))), replace=False)
-    model, _ = M.train_ae(model, X_input[train_idx], _local_val_idx(train_idx, val),
-                          device, epochs=epochs, patience=25,
-                          soft_mask=soft_mask, soft_lambda=soft_lambda)
+    if early_stop:
+        val = rng.choice(train_idx, size=max(2, int(0.15 * len(train_idx))), replace=False)
+        val_local = _local_val_idx(train_idx, val)
+    else:
+        val_local = np.array([0])                       # unused when early_stop=False
+    model, _ = M.train_ae(model, X_input[train_idx], val_local, device, epochs=epochs,
+                          patience=25, soft_mask=soft_mask, soft_lambda=soft_lambda,
+                          early_stop=early_stop)
     return M.embed(model, X_input, device)
 
 
@@ -138,7 +142,7 @@ def torch_seed(seed):
 
 
 def run_cv(data, spec, task_key, condition, device, seeds=(0, 1), n_splits=5, epochs=250,
-           return_flat=False, z_dim=64):
+           return_flat=False, z_dim=64, early_stop=True):
     """Macro-F1 for one model x condition x task via nested donor-CV.
 
     Returns per-seed means by default; if return_flat, returns a list of
@@ -165,7 +169,8 @@ def run_cv(data, spec, task_key, condition, device, seeds=(0, 1), n_splits=5, ep
                 k = int(condition.split(":")[1])
                 tr_donors = rng.permutation(np.unique(donor[tr]))[:k]
                 tr_use = tr[np.isin(donor[tr], tr_donors)]
-            emb = make_embedder(spec, data, tr_use, device, seed, epochs, X_input, z_dim=z_dim)
+            emb = make_embedder(spec, data, tr_use, device, seed, epochs, X_input,
+                                z_dim=z_dim, early_stop=early_stop)
             f1, _ = probe_precomputed(emb, y, donor, [(tr_use, te)], labels=labels)
             fold_scores.append(f1)
             flat.append({"seed": seed, "fold": fi, "f1": f1})

@@ -83,8 +83,13 @@ def build_mask(graph: dict, name: str, genes_order: np.ndarray, n_hidden: int, d
 
 
 def train_ae(model, X, val_idx, device, epochs=300, lr=1e-3, wd=1e-4, patience=30,
-             soft_mask=None, soft_lambda=0.0, verbose=False):
-    """Train an autoencoder with early stopping on held-out reconstruction MSE.
+             soft_mask=None, soft_lambda=0.0, early_stop=True, verbose=False):
+    """Train an autoencoder.
+
+    early_stop=True (default): hold out `val_idx` and early-stop on its reconstruction MSE.
+    early_stop=False: FIXED budget -- train `epochs` on ALL rows, no val carve-out, no checkpoint
+    selection. Avoids selecting on a noisy train-donor val slice and uses the full training data;
+    justified once training is known to have converged by that budget.
 
     soft_mask/soft_lambda: SOFT graph prior. On a dense first layer, add a penalty
     soft_lambda * ||W ⊙ (1 - mask)||^2 that shrinks off-regulon weights toward zero without
@@ -96,10 +101,23 @@ def train_ae(model, X, val_idx, device, epochs=300, lr=1e-3, wd=1e-4, patience=3
         soft_mask = soft_mask.to(device)
         off = 1.0 - soft_mask
     n = X.shape[0]
+    opt = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=wd)
+
+    if not early_stop:                                  # fixed-budget: train on ALL rows
+        for ep in range(epochs):
+            model.train()
+            opt.zero_grad()
+            recon, _ = model(X)
+            loss = F.mse_loss(recon, X)
+            if soft_lambda > 0 and soft_mask is not None:
+                loss = loss + soft_lambda * (model.enc1.weight * off).pow(2).sum()
+            loss.backward()
+            opt.step()
+        return model, float(loss.item())
+
     mask_val = torch.zeros(n, dtype=torch.bool, device=device)
     mask_val[val_idx] = True
     Xtr, Xva = X[~mask_val], X[mask_val]
-    opt = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=wd)
 
     best, best_state, bad = float("inf"), None, 0
     for ep in range(epochs):
