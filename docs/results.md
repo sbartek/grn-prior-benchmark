@@ -1,76 +1,83 @@
-# Results
+# Results — detailed
 
-Full interpretation in [`memo/memo.md`](https://github.com/sbartek/grn-prior-benchmark/blob/main/memo/memo.md).
-All scores: donor-grouped 5-fold CV, macro-F1, mean over 2 seeds.
-
-## Dataset suitability (Step 1, confirmed on data)
-108,717 cells × 61,497 genes, **raw integer counts**. Balanced **18 RA / 18 normal** donors;
-**no sex confound** (12F/6M in both arms); **single assay** (10x 3′ v3, so no assay–disease
-confound); **15 cell types** present (some rare: CD4 α-β T 595 cells, γδ-T 1,424). Design is
-between-subjects → disease is confounded with donor. Consequence: **cell type** = trustworthy
-readout, **disease** = suggestive only, always splitting by donor.
+The full evaluation. For *what* each model is see [Models](models.md); for *how* it's measured see
+[Evaluation](evaluation.md); to run it yourself see the
+[evaluation notebook](https://github.com/sbartek/grn-prior-benchmark/blob/main/notebooks/03_evaluation.ipynb).
+All numbers are **cell-type macro-F1** (donor-grouped 5-fold CV) unless noted.
 
 ## Headline
-**How you use the GRN matters more than whether you use it.** As a *deep-encoder constraint*
-(hard/soft mask) it hurts, and a rewired graph does as well → regularization, not biology. As a
-*fixed TF-activity transform* (decoupler ULM) it carries real signal — beats a matched-dimension
-random projection everywhere — and **beats PCA and the baseline in the low-data regime**, though
-at full data it only ties PCA. Not DoRothEA-specific (CollecTRI ≥ it) and replicates on COVID.
-Full write-up: [`memo/memo.md`](https://github.com/sbartek/grn-prior-benchmark/blob/main/memo/memo.md).
+**How you *use* the GRN matters more than whether you use it.** Baked into a learned encoder it
+*hurts*; used as a fixed **TF-activity transform** it carries real signal and **wins under low
+data**; and the winner even **depends on the metric** (PCA wins the supervised probe but is worst
+on unsupervised clustering).
 
-## Round 2 — TF-activity vs learned encoders (primary dataset)
-![round2](img/fig_round2.png)
+## Consolidated comparison table
 
-## Dimensionality vs biology (matched-dim random + CollecTRI controls)
+| Model | Prim full | Prim k=8 | Prim noise | COVID full | COVID k=8 | COVID noise | COVID disease | Cluster ARI |
+|---|---|---|---|---|---|---|---|---|
+| PCA | **0.869** | 0.632 | 0.770 | **0.936** | 0.760 | **0.919** | **0.715** | 0.12 |
+| baseline (dense AE) | 0.785 | 0.661 | 0.732 | 0.860 | 0.696 | 0.859 | 0.588 | 0.26 |
+| dc_tfact | 0.847 | 0.686 | 0.720 | 0.906 | **0.763** | 0.876 | 0.659 | 0.28 |
+| dc_tfact_collectri | **0.869** | **0.746** | **0.784** | – | – | – | – | **0.30** |
+| dc_tfact_pca | 0.783 | 0.630 | 0.686 | 0.896 | 0.739 | 0.849 | 0.673 | – |
+| rand_proj (null) | 0.775 | 0.624 | 0.648 | – | – | – | – | – |
+| dc_tfact_rewired (null) | 0.804 | 0.661 | 0.703 | – | – | – | – | – |
+| grn_real (encoder) | 0.714 | 0.591 | 0.615 | 0.855 | 0.647 | 0.781 | 0.654 | 0.21 |
+| grn_rewired (null) | 0.665 | 0.569 | 0.559 | 0.838 | 0.659 | 0.749 | 0.646 | – |
+| grn_soft:0.001 | 0.753 | 0.641 | 0.715 | 0.762 | 0.613 | 0.803 | 0.499 | – |
+| grn_decoder | 0.738 | 0.612 | 0.656 | 0.832 | 0.622 | 0.814 | 0.664 | 0.24 |
+| grn_symmetric | 0.675 | 0.557 | 0.595 | 0.818 | 0.588 | 0.774 | 0.639 | – |
+
+*Prim = primary RA PBMC · COVID = second dataset · k=8 = 8 training donors · noise = count-thinning
+p=0.3 · COVID disease = 3-class (chance ≈ 0.33) · Cluster ARI = unsupervised KMeans vs cell type ·
+– = not run for that model.*
+
+## The two ways to use the graph
+![headline](img/fig_final.png)
+`grn_*` (encoder constraint) sits below PCA/baseline everywhere and corrupted graphs do as well
+(regularization, not biology). `dc_tfact` (transform) beats its rewired-net and random nulls, and
+wins under low data (CollecTRI strongest).
+
+## Dimensionality vs biology
 ![dimcheck](img/fig_dimcheck.png)
-`dc_tfact` (293-d) beats `rand_proj` (293-d random features) everywhere → the biology is real, not
-just dimensionality. But it only ties PCA at full data and wins under **low data** (CollecTRI
-strongest). At matched 64-d, `dc_tfact_pca` ≈ baseline.
+`dc_tfact` (293-d) beats `rand_proj` (293-d random) everywhere → the biology is real, not just
+dimensionality. But at 64-d (`dc_tfact_pca`) it ≈ baseline, and at full data it only ties PCA.
 
-## Bottleneck-dimension sensitivity (not a tuning artifact)
-![bottleneck](img/fig_bottleneck.png)
-Across z ∈ {32, 64, 128} the ordering PCA ≥ baseline ≈ soft-prior > hard-mask is stable and
-`grn_real` is always worst. A wider bottleneck helps the mask but never enough to reach baseline.
-
-## Second dataset (COVID PBMC) — external validity
+## External validity — COVID PBMC
 ![covid](img/fig_covid.png)
-Same ordering (PCA ≥ TF-activity > baseline ≈ GRN-mask > soft prior) → not RA-specific.
+Same ordering on a second dataset (75 donors, 28 cell types) → not RA-specific.
 
-## COVID disease (3-class, decodable unlike RA)
+## Disease — decodable on COVID (but confounded)
 ![covid_disease](img/fig_covid_disease.png)
-Disease *is* decodable here (PCA best, 0.715). GRN-mask models beat the overfit dense baseline, but
-`grn_rewired` matches them → regularization, not biology.
+RA disease (2-class) is at chance; COVID disease (3-class) **is** decodable (PCA best, 0.715) — but
+between-subjects, so partly donor identity.
 
-## Full-data comparison
-![full](img/fig_full.png)
-Cell type: PCA **0.868** > baseline 0.791 > random 0.731 > real 0.699 = sign-shuffled 0.699 >
-rewired 0.650. The real graph does **not** beat its same-density controls — the decisive test is
-negative: any effect is sparsity, not regulatory content.
+## Robustness — bottleneck dimension
+![bottleneck](img/fig_bottleneck.png)
+Ordering stable across z ∈ {32, 64, 128}; the hard mask is always worst → not a z=64 artifact.
 
-## Low-data
-![lowdata](img/fig_lowdata.png)
-Baseline > grn_real > grn_rewired at every training-donor count (k=4/8/16). The prior does not
-rescue the low-data regime; but grn_real consistently edges grn_rewired (weak structural signal).
+## Supervised probe vs unsupervised clustering — the metric flips the winner
+The `Cluster ARI` column tells a different story from the probe: **PCA is worst (0.12)** while
+GRN-informed **CollecTRI TF-activity is best (0.30)**, with the autoencoders above PCA too. PCA
+maximizes linear *separability* but leaves overlapping geometry; the biological representations form
+**tighter clusters**. So "PCA wins" was probe-specific. (See the clustering + DBSCAN demo in the
+[evaluation notebook](https://github.com/sbartek/grn-prior-benchmark/blob/main/notebooks/03_evaluation.ipynb).)
 
-## Noise robustness
-![noise](img/fig_noise.png)
-Same ordering under count-thinning (p=0.3, 0.1). The prior does not improve noise robustness.
-
-## Graph corruption (decisive)
-At full data grn_real (0.699) ties sign-shuffled (0.699) and is **below random** (0.731). Under
-low-data/noise grn_real > grn_rewired but the gap is small and never reaches baseline. Verdict:
-the *specific* DoRothEA biology adds little beyond graph density.
-
-## Density ablation (confidence A / AB / ABC, with rewired controls)
-![density](img/fig_density.png)
-Sparser high-confidence graphs beat the dense full graph (real_A 0.788 ≈ baseline 0.791 ≫ real
-0.699). But **rewired_A** matches real_A — and *beats* it under low data (0.686 vs 0.671) — so the
-improvement is mostly **sparsity/regularization, not biology**. The true topology adds only a
-small margin over its rewired control at full data and under noise. Bottom line: what looks like
-"the prior helps" is largely a density effect; the specific regulatory structure is a minor lever
-and never beats the baseline.
-
-## Biology vs batch/donor
+## Biology vs batch — donor leakage
 ![leakage](img/fig_leakage.png)
-Donor-prediction accuracy (lower = less leakage): baseline 0.086 < random 0.098 < grn_real 0.114
-< sign-shuf 0.132 < rewired 0.136 < PCA 0.166. The prior does not reduce donor signal.
+Donor-predictability (lower = less batch leakage): the prior doesn't reduce donor signal; the plain
+baseline leaks least.
+
+## Confidence / density ablation
+![density](img/fig_density.png)
+High-confidence (A) DoRothEA edges ≈ baseline, but a rewired-A graph matches them → the density
+effect is regularization, not the specific edges.
+
+## Verdict
+- **Graph-as-encoder-constraint hurts** — below PCA/baseline, corrupted graphs do as well.
+- **Graph-as-TF-activity-transform helps** — real biology (beats rewired-net & random), wins under
+  **low data**, not prior-specific (CollecTRI ≥ DoRothEA), replicates on COVID.
+- **Placement matters** — decoder > encoder > symmetric, none beats the dense baseline.
+- **The metric matters** — PCA wins the probe, loses the clustering.
+- **Honest scope** — disease is only decodable where the design allows (COVID), and even there it's
+  partly donor identity.
