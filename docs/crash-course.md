@@ -47,6 +47,8 @@ and model.
 of your body. Think of it as a reference library that never leaves the building — you don't
 check the master books out, you photocopy the page you need.
 
+- **Precisely:** DNA is one long *sequence of chemical bases* (A/T/G/C — ~3.2 billion of them);
+  a **gene** is a meaningful stretch *within* that sequence (genes are only ~1–2% of the total).
 - A **gene** = one stretch of DNA that codes for one product.
 - Same DNA in every cell ⇒ DNA *alone* can't explain why a T-cell differs from a B-cell, or a
   sick donor from a healthy one. **The difference is which genes each cell uses.**
