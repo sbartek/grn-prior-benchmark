@@ -109,6 +109,17 @@ if modest, biology signal. But **none beats the dense baseline (0.785) or PCA (0
 better-placed prior helps *relative to other constrained models*, yet still doesn't beat doing
 nothing — reinforcing the main conclusion. (`13_decoder_prior.py`, `decoder.csv`.)
 
+## Supervised probe vs unsupervised clustering — the metric flips the winner
+The probe measures *linear separability*; a label-free **clustering** metric (KMeans, ARI/NMI vs
+cell type — the scIB-style test) measures *intrinsic structure*. They disagree sharply (`14_
+clustering.py`, `clustering.csv`): by ARI, **PCA is worst (0.12)** while GRN-informed **CollecTRI
+TF-activity is best (0.30)**, with the autoencoders (0.22–0.26) also above PCA. PCA maximises
+variance/separability but leaves elongated, overlapping geometry; the TF-activity transforms and
+learned encoders produce **tighter cell-type clusters**. So "PCA wins" is *probe-specific* — on the
+intrinsic-structure metric the biological representations come out ahead. Reporting both matters:
+they answer different questions and here they disagree. (Clustering scores are modest overall — the
+15 types include very similar T-cell subtypes — so this qualifies rather than overturns the story.)
+
 ## Interpretation
 The GRN is not useless — as a TF-activity transform it encodes real regulatory signal and gives a
 genuine low-data/regularization benefit (stronger with CollecTRI). But it is **not more

@@ -242,8 +242,33 @@ for _eps in [3, 6, 10]:
 #    on a kNN graph)** + ARI/NMI (scIB), not DBSCAN. KMeans is a reasonable quick proxy; DBSCAN is
 #    not.
 #
-# So: yes, unsupervised clustering is a sensible *complementary* evaluation (and a good next step to
-# add per-model ARI/NMI), but pick Leiden/KMeans over DBSCAN for this data.
+# So: yes, unsupervised clustering is a sensible *complementary* evaluation, but pick Leiden/KMeans
+# over DBSCAN for this data.
+
+# %% [markdown]
+# ### Per-model clustering (KMeans ARI/NMI vs cell type) — the metric flips the winner
+# Running the label-free clustering metric across models (`14_clustering.py`) gives a strikingly
+# *different* ranking from the supervised probe.
+
+# %%
+clustering = load("clustering.csv")
+if clustering is not None:
+    cl = clustering.melt("model", ["ARI", "NMI"], var_name="metric", value_name="score")
+    fig = px.bar(cl, x="model", y="score", color="metric", barmode="group",
+                 title="unsupervised clustering vs cell type — TF-activity/AE beat PCA (opposite of the probe)")
+    fig.update_layout(height=420, width=780)
+    display(fig)
+    display(clustering.set_index("model").round(3))
+
+# %% [markdown]
+# **The winner depends on the metric.** By the *supervised probe*, PCA wins; by *unsupervised
+# clustering*, PCA is **worst** (ARI ≈ 0.12) and the GRN-informed **CollecTRI TF-activity** (≈ 0.30)
+# and the autoencoders cluster best. PCA maximises linear *separability* but leaves elongated,
+# overlapping geometry; the TF-activity transforms and learned encoders produce **tighter, more
+# clustered** cell-type groups. So "PCA is best" was probe-specific — on the intrinsic-structure
+# (scIB-style) metric, the biological representations come out ahead. This is why reporting *both* a
+# supervised probe and an unsupervised clustering metric matters: they answer different questions and
+# here they disagree.
 
 # %% [markdown]
 # ## Verdict
@@ -254,6 +279,9 @@ for _eps in [3, 6, 10]:
 # - **Placement matters:** the **decoder** (causal TF→gene direction, expiMap-style) is a better
 #   place than the encoder, and there the real graph beats its rewired control — but it still does
 #   not beat the dense baseline.
+# - **The metric matters.** "PCA wins" holds for the *supervised probe*; on the *unsupervised*
+#   clustering metric (ARI/NMI) PCA is **worst** and the GRN-informed TF-activity clusters best. The
+#   biological prior helps *intrinsic cluster structure* even where it doesn't help linear probing.
 # - **Not prior-specific** (CollecTRI ≥ DoRothEA), **replicates** on COVID, **robust** to bottleneck
 #   size and to removing early stopping. Disease is decodable only where the design allows it
 #   (COVID 3-class), and even there it is partly donor identity.
