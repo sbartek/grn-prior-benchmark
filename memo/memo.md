@@ -137,6 +137,13 @@ the bottleneck dimension (32/64/128) — the robustness checks that actually gua
 bottleneck sweep confirms the ordering is stable and the hard mask is always worst, so the result is
 not a z=64 tuning artifact.
 
+## Robustness to the early-stopping choice
+The autoencoders early-stop on a held-out slice of the *training* donors (never the test donors,
+so no evaluation leakage — but it does select on a small, noisy val set). We re-ran the full sweep
+with a **fixed epoch budget on all training donors, no early stopping** (`12_final_fixedbudget.py`,
+`final_fixedbudget.csv`): the verdict is unchanged — **mean |ΔF1| = 0.004, max = 0.025**, ordering
+identical. So the conclusion is not an artifact of early stopping.
+
 ## What would make it biologically stronger
 A genuinely *regulatory* readout (perturbation response or measured TF activity) rather than
 cell-type identity, which linear methods already solve; **within-subjects** perturbation data so
