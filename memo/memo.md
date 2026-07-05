@@ -165,11 +165,40 @@ with a **fixed epoch budget on all training donors, no early stopping** (`12_fin
 `final_fixedbudget.csv`): the verdict is unchanged — **mean |ΔF1| = 0.004, max = 0.025**, ordering
 identical. So the conclusion is not an artifact of early stopping.
 
-## What would make it biologically stronger
-A genuinely *regulatory* readout (perturbation response or measured TF activity) rather than
-cell-type identity, which linear methods already solve; **within-subjects** perturbation data so
-state isn't aliased with donor; more datasets/assays; and a soft/GNN prior evaluated specifically
-in the low-data regime where the transform already shows a benefit.
+## Next steps & ideas
+
+**Models / architecture**
+- **Supervised & transfer embeddings.** Train the encoder to predict one label (cell type), then
+  probe a *different* one (disease) — a non-circular transfer test (semi-supervised, à la scANVI);
+  or compare supervised dense-vs-graph-masked to ask whether the prior helps a *classifier* rather
+  than an unsupervised representation. (Same-label supervised eval is circular — excluded.)
+- **A real GNN.** We covered masked-MLP + soft penalty; a message-passing GNN (GCN/GAT over the
+  DoRothEA graph) is the one learned-prior family untested — it could use higher-order structure.
+- **Prior as init/regularizer, not hard constraint.** Warm-start a dense encoder from the graph, or
+  add TF-activity prediction as an *auxiliary loss* — softer injections that might keep the benefit
+  without the capacity cost. (Decoder placement already helped; this is the next axis.)
+
+**The prior itself — likely the biggest lever**
+- **Cell-type-specific / context networks.** DoRothEA is a single *global* consensus network, but
+  regulation is context-specific — a global prior may be *why* it underperformed. Use per-cell-type
+  GRNs (SCENIC) or context-matched networks.
+- **Combine / weight priors.** CollecTRI ≥ DoRothEA; try ensembling networks, or using DoRothEA's
+  confidence/fractional edge weights instead of binarized ±1.
+
+**Evaluation**
+- **Full scIB panel.** We added KMeans ARI/NMI; add Leiden + cLISI/kBET/silhouette/isolated-label-F1
+  + batch metrics for a canonical, metric-robust readout.
+- **Interpretability payoff.** The literature says biology-wired nets win on *interpretability*, not
+  accuracy — evaluate whether the masked/TF-activity models surface the *correct* driver TFs.
+- **Proper statistics.** Mixed-effects models accounting for donor structure; more seeds/folds; CIs.
+
+**Data & design — breaks the core limitations**
+- **A genuinely regulatory readout** (perturbation response / measured TF-activity / cell-state
+  transitions) rather than cell-type identity, which linear methods already solve.
+- **Within-subjects / longitudinal design** (same donor before/during/after) to break the
+  donor–disease confound that caps the disease readout.
+- **Scale question:** does the prior's low-data benefit vanish as data grows (the STATE / foundation-
+  model regime)? Pretrain-then-finetune to test.
 
 ## What I deliberately left out (48h scope)
 Raw single-cell modeling; STATE/metabolic/pathway priors (out of scope); a full GNN (masked-MLP +
