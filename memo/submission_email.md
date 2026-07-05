@@ -4,32 +4,31 @@ Hi Caelan,
 
 Here is my submission for the GRN-Prior Expression Embedding Benchmark:
 
-  https://github.com/sbartek/grn-prior-benchmark
+  Repo:  https://github.com/sbartek/grn-prior-benchmark
+  Memo:  memo/memo.pdf  (3-page write-up; source in memo/memo.md)
+  Site:  https://sbartek.github.io/grn-prior-benchmark/  (detailed results + a short wiki on the
+         models and evaluation techniques)
 
-Everything needed to review and run it is in the README; the 2-page write-up is in
-`memo/memo.md`, and a rendered docs site is at https://sbartek.github.io/grn-prior-benchmark/.
+Short version of what I found: how you *use* the graph matters more than whether you use it.
+Baking DoRothEA into a learned encoder (hard or soft mask) hurts, and a degree-preserving rewired
+graph does just as well, so that effect is regularization rather than biology. Using the same graph
+the classical way — as a fixed decoupler ULM TF-activity transform — carries genuine signal (it
+beats both a rewired-network and a random-projection control) and wins specifically in the low-data
+regime; CollecTRI does this a bit better than DoRothEA. Interestingly the winner depends on the
+metric: a plain PCA baseline tops the supervised probe, but the GRN-informed representations win the
+stricter unsupervised clustering test. On the primary RA data disease is confounded with donor, so I
+treat cell type as the trustworthy readout; on the COVID backup (3 disease states) disease is
+decodable but still partly donor identity. Results replicate on that second dataset. Full reasoning,
+controls, and limitations are in the memo.
 
-Short version of what I found: on the trustworthy readout (cell type, donor-grouped CV), the
-full DoRothEA prior underperforms both PCA and an unconstrained autoencoder. Restricting to
-high-confidence edges closes most of the gap, but a density ablation with degree-preserving
-rewired controls shows that improvement is mostly a sparsity/regularization effect rather than
-regulatory biology; the specific topology adds only a small, consistent margin over its rewired
-control at full data and under noise, and never beats the baseline. Disease is not decodable
-from held-out donors on this between-subjects dataset, so it can't adjudicate the question. I
-kept the comparison capacity-matched and tried to defend any apparent benefit against the
-obvious "it's just sparsity" alternative — details and limitations are in the memo.
+How to review / run: the README has the setup and one-command-per-step pipeline (uv + Python 3.11).
+Three notebooks tell the story end to end: 01 (EDA & dataset suitability), 02 (a tiny toy example
+building the intuition), 03 (the full evaluation). The detailed numbers and figures are on the site
+linked above.
 
-Reproduce:
-  uv venv --python 3.11 && uv pip install -r requirements.txt
-  uv run python scripts/00_fetch_data.py      # caches the CELLxGENE subset
-  uv run python scripts/01_build_pseudobulk.py
-  uv run python scripts/02_build_graph.py
-  uv run python scripts/03_run_experiments.py  # + 05_density_ablation.py for the ablation
-
-There's also an interactive EDA notebook (`notebooks/01_eda_suitability.ipynb`, with a
-self-contained HTML export) covering dataset suitability and the donor confound.
-
-Happy to walk through any of the choices and results.
+I tried to keep the comparison fair and honest — scrambled-graph controls throughout, held-out
+donors, and reporting the cases where the prior loses as plainly as where it wins. Happy to walk
+through any of the choices and results.
 
 Best,
 Bartek
