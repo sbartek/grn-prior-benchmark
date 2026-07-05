@@ -65,6 +65,11 @@ For reviewing without running, open the self-contained
 [`notebooks/01_eda_suitability.html`](notebooks/01_eda_suitability.html) (Plotly.js embedded,
 renders offline in any browser).
 
+`notebooks/02_toy_example.ipynb` — a tiny illustrative example (12 genes, 3 TFs, 3 cell types)
+comparing **graph-aware vs not-graph-aware** representations as noise grows: shows *why* a GRN
+prior denoises (aggregating co-regulated genes) and *why the right graph matters* (a rewired graph
+destroys the signal). Standalone view: [`02_toy_example.html`](notebooks/02_toy_example.html).
+
 ## Layout
 `src/grn_bench/` core lib · `scripts/` pipeline · `notebooks/` EDA · `results/` figures+tables ·
 `memo/` write-up. Full design rationale in `PLAN.md`; findings in `memo/memo.md`.
