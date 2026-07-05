@@ -347,29 +347,45 @@ fig
 # red/blue = graph edges kept by the mask (activate / repress).
 
 # %%
-def draw_ae(mode, W=None, title=""):
+def draw_ae(enc_masked=False, dec_masked=False, W=None, title=""):
     sizes = [N_GENES, N_TF, 2, N_TF, N_GENES]
     xs = [0, 1, 2, 3, 4]
     ys = [np.linspace(0.05, 0.95, s) for s in sizes]
     fig = go.Figure()
+    dense = [1, 2]                                       # hidden->z, z->hidden are always dense
+    if not enc_masked:
+        dense = [0] + dense                              # gene->TF dense
+    if not dec_masked:
+        dense = dense + [3]                              # TF->gene dense
     gx, gy = [], []
-    layers_dense = [1, 2, 3] if mode != "dense" else [0, 1, 2, 3]   # baseline: layer 0 also dense
-    for li in layers_dense:
+    for li in dense:
         for a in range(sizes[li]):
             for b in range(sizes[li + 1]):
                 gx += [xs[li], xs[li + 1], None]; gy += [ys[li][a], ys[li + 1][b], None]
     fig.add_trace(go.Scatter(x=gx, y=gy, mode="lines", line=dict(color="lightgray", width=0.5),
                              hoverinfo="none", showlegend=False))
-    if mode == "masked":                                            # colored, signed first layer
-        for sgn, color, name in [(1, "crimson", "activates (+)"), (-1, "royalblue", "represses (−)")]:
+
+    def color_layer(src_x, dst_x, gene_is_src):          # draw graph edges of a masked layer
+        for sgn, color in [(1, "crimson"), (-1, "royalblue")]:
             ex, ey = [], []
             for t in range(N_TF):
                 for g in range(N_GENES):
                     if W[t, g] != 0 and np.sign(W[t, g]) == sgn:
-                        ex += [xs[0], xs[1], None]; ey += [ys[0][g], ys[1][t], None]
+                        gy_, ty_ = ys[0 if gene_is_src else 4][g], ys[1 if gene_is_src else 3][t]
+                        ex += [src_x, dst_x, None]
+                        ey += [(gy_ if gene_is_src else ty_), (ty_ if gene_is_src else gy_)]
+                        ey += [None]
             if ex:
                 fig.add_trace(go.Scatter(x=ex, y=ey, mode="lines", line=dict(color=color, width=1.6),
-                                         hoverinfo="none", name=name))
+                                         hoverinfo="none", showlegend=False))
+    if enc_masked:
+        color_layer(xs[0], xs[1], True)                  # gene -> TF
+    if dec_masked:
+        color_layer(xs[3], xs[4], False)                 # TF -> gene (causal, expiMap direction)
+    if enc_masked or dec_masked:
+        fig.add_trace(go.Scatter(x=[None], y=[None], mode="lines", line=dict(color="crimson"), name="activates (+)"))
+        fig.add_trace(go.Scatter(x=[None], y=[None], mode="lines", line=dict(color="royalblue"), name="represses (−)"))
+
     names = ["genes (12)", "TF hidden (3)", "z (2)", "TF hidden (3)", "genes out (12)"]
     for li in range(5):
         fig.add_trace(go.Scatter(x=[xs[li]] * sizes[li], y=ys[li], mode="markers",
@@ -380,21 +396,36 @@ def draw_ae(mode, W=None, title=""):
     return fig
 
 
-draw_ae("dense", title="baseline autoencoder: DENSE first layer (every gene → every TF unit)")
+draw_ae(title="baseline autoencoder: DENSE throughout (every gene → every TF unit, both ways)")
 
 # %%
-draw_ae("masked", W_clean, title="grn_real (clean graph): first layer MASKED to TF→target edges")
+draw_ae(enc_masked=True, W=W_clean, title="grn_real: ENCODER masked (gene→TF first layer = the graph)")
 
 # %%
-draw_ae("masked", W_tangled, title="grn_real (tangled graph): masked + signed, overlapping regulons")
+draw_ae(enc_masked=True, W=W_tangled, title="grn_real (tangled graph): masked + signed, overlapping regulons")
+
+# %%
+draw_ae(dec_masked=True, W=W_clean,
+        title="grn_decoder (expiMap-style): DECODER masked — reconstruct each gene from its regulators")
+
+# %%
+draw_ae(enc_masked=True, dec_masked=True, W=W_clean,
+        title="grn_symmetric: BOTH layers masked (gene→TF and TF→gene)")
 
 # %% [markdown]
-# The baseline's first layer is a full mesh (grey) — ~36 free weights on the toy (~3.4M on the real
-# data). The masked encoder keeps only the graph's edges (12 on the clean toy, coloured by sign);
-# everything downstream (TF-hidden → z → decode) is identical. So "graph-aware encoder" literally
-# means **delete the first-layer connections that aren't regulatory edges**. On the real data this
-# constraint *hurt* — the mesh, though it overfits, still beat the mask, and a rewired mask did as
-# well as the real one.
+# Four autoencoders, differing only in **which layers the graph masks** (grey = dense/free;
+# coloured = kept graph edges):
+# - **baseline** — dense both ways (~36 free weights on the toy, ~3.4M on the real data).
+# - **grn_real** — mask the **encoder** (gene→TF). The *inverse* direction (infer TF activity from
+#   genes).
+# - **grn_decoder** — mask the **decoder** (TF→gene). The **causal / generative** direction — a gene
+#   is reconstructed only from its regulators. This is the expiMap-style placement, and on the real
+#   data it did **better** than encoder-masking (and there the real graph beat its rewired control).
+# - **grn_symmetric** — mask **both** (the strongest constraint; worst on the real data).
+#
+# So "graph-aware autoencoder" means **delete the connections that aren't regulatory edges** — and
+# *where* you delete them (encoder vs decoder) matters. On the real data the dense mesh still beat
+# every masked variant, but the decoder placement was the best of the graph-constrained models.
 
 # %% [markdown]
 # ## Takeaway (maps directly to the real project)
