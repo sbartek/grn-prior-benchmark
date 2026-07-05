@@ -235,6 +235,79 @@ fig.update_layout(height=640, width=820)
 fig
 
 # %% [markdown]
+# ## From cartoon to reality: overlapping regulons + repressors
+# So far each gene had **one** activating TF — a clean partition. Real GRNs are **many-to-many**:
+# a TF regulates ~73 genes, a gene is regulated by ~3–4 TFs, and many edges **repress** (−1). We
+# now give each gene a strong **primary** activator *plus* a weaker **secondary** edge (±0.5,
+# sometimes repressing) — overlapping, signed regulons — and watch the clean benefit erode.
+
+# %%
+def make_W(tangled, seed=5):
+    W = np.zeros((N_TF, N_GENES))
+    for g in range(N_GENES):
+        W[gene_tf[g], g] = 1.0                       # primary activating edge
+    if tangled:
+        r = np.random.default_rng(seed)
+        for g in range(N_GENES):
+            sec = (gene_tf[g] + r.integers(1, N_TF)) % N_TF   # a *different* TF also regulates g
+            W[sec, g] = r.choice([0.5, -0.5])         # weaker, sometimes a repressor
+    return W
+
+W_clean, W_tangled = make_W(False), make_W(True)
+fig = make_subplots(rows=1, cols=2, subplot_titles=("clean regulons (1 TF/gene, all +)",
+                                                    "tangled regulons (overlap + repressors)"))
+for c, W in enumerate([W_clean, W_tangled], start=1):
+    fig.add_trace(go.Heatmap(z=W, colorscale="RdBu", reversescale=True, zmid=0, zmin=-1, zmax=1,
+                             showscale=(c == 2)), 1, c)
+fig.update_layout(height=300, width=900, title="regulon membership: TF (rows) × gene (cols)")
+fig.update_yaxes(tickvals=list(range(N_TF)), ticktext=[f"TF{t}" for t in range(N_TF)])
+fig.update_xaxes(title_text="gene")
+fig
+
+# %%
+def sim_from_W(W, noise, n_per_type=60, seed=0):
+    r = np.random.default_rng(seed)
+    X, y = [], []
+    for k in range(N_TF):                            # cell type k -> only TF k active
+        a = np.zeros(N_TF); a[k] = 1.0
+        base = (W.T @ a) * 2.0                       # gene expression driven by the TF states
+        X.append(base + r.normal(0, noise, (n_per_type, N_GENES)))
+        y += [k] * n_per_type
+    return np.vstack(X), np.array(y)
+
+def tf_act_W(X, W):                                  # signed regulon aggregation
+    cols = []
+    for t in range(N_TF):
+        idx = W[t] != 0
+        cols.append((X[:, idx] @ W[t, idx]) / idx.sum())
+    return np.column_stack(cols)
+
+# Data now has tangled (overlapping, signed) biology. We aggregate it two ways: with the CORRECT
+# tangled graph, vs with an INCOMPLETE graph that only knows the primary activating edges (the kind
+# of gap a real, imperfect prior has).
+rows = []
+for label, W_agg in [("aggregate w/ CORRECT graph", W_tangled),
+                     ("aggregate w/ INCOMPLETE graph", W_clean)]:
+    for noise in [0.5, 1.0, 1.5, 2.0, 3.0, 4.0, 5.0]:
+        Xn, yn = sim_from_W(W_tangled, noise, seed=0)      # tangled biology
+        rows.append(dict(noise=noise, representation=label, accuracy=probe_acc(tf_act_W(Xn, W_agg), yn)))
+res2 = pd.DataFrame(rows)
+fig = px.line(res2, x="noise", y="accuracy", color="representation", markers=True,
+              title="tangled biology: knowing the full graph beats an incomplete one")
+fig.add_hline(y=1/3, line_dash="dot", annotation_text="chance (1/3)")
+fig.update_layout(height=440, width=760, yaxis_range=[0, 1.02])
+fig
+
+# %% [markdown]
+# **The honest lesson.** Overlap and repressors *on their own* don't break the prior — if you know
+# the true tangled graph, signed aggregation still recovers the signal (blue). The benefit erodes
+# when the graph is **incomplete/wrong** and misses real cross-talk (orange), which then leaks in as
+# noise. On real data *both* hold at once: DoRothEA's regulons overlap and are signed **and** the
+# graph is a noisy, partial estimate — together these are a big part of *why* the prior's benefit is
+# modest and shows up mainly in the low-data / high-noise regime rather than everywhere. (And it's
+# why the fully-scrambled `rewired` graph above fails outright — the extreme of a wrong graph.)
+
+# %% [markdown]
 # ## Takeaway (maps directly to the real project)
 # - A GRN prior used as a **feature transform** (aggregate co-regulated genes) buys **robustness to
 #   noise** — exactly the "helps most when data is degraded / scarce" result on the real data.

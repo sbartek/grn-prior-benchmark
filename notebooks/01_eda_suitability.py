@@ -149,6 +149,12 @@ in_deg = np.bincount(g["real_rows"], minlength=len(genes))
 print(f"input genes={len(genes)}  TFs(hidden)={len(tfs)}  edges={len(g['real_rows'])}  "
       f"density={len(g['real_rows'])/(len(genes)*len(tfs)):.4f}")
 
+# connectivity is many-to-many: a TF regulates MANY genes; a gene is regulated by SEVERAL TFs
+od = out_deg[out_deg > 0]           # TF -> #genes (regulon size)
+idg = in_deg[in_deg > 0]            # gene -> #TFs
+print(f"TF -> genes   (regulon size):    min={od.min():4d}  max={od.max():5d}  avg={od.mean():6.1f}  median={int(np.median(od))}")
+print(f"gene -> TFs   (# regulators):     min={idg.min():4d}  max={idg.max():5d}  avg={idg.mean():6.1f}  median={int(np.median(idg))}")
+
 deg_df = pd.concat([
     pd.DataFrame({"degree": out_deg, "which": "TF out-degree (regulon size)"}),
     pd.DataFrame({"degree": in_deg, "which": "gene in-degree (# regulating TFs)"}),
