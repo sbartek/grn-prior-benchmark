@@ -410,7 +410,7 @@ draw_ae(dec_masked=True, W=W_clean,
 
 # %%
 draw_ae(enc_masked=True, dec_masked=True, W=W_clean,
-        title="grn_symmetric: BOTH layers masked (gene→TF and TF→gene)")
+        title="grn_symmetric: DOUBLE graph-aware — BOTH encoder (gene→TF) and decoder (TF→gene) masked")
 
 # %% [markdown]
 # Four autoencoders, differing only in **which layers the graph masks** (grey = dense/free;
@@ -440,3 +440,61 @@ draw_ae(enc_masked=True, dec_masked=True, W=W_clean,
 # This toy has no learned encoder, but the intuition transfers: aggregating along the *correct*
 # regulatory graph denoises; along a *wrong* graph it destroys signal — which is why *which* way you
 # use the graph, and whether it's the real one, matters more than simply "using a graph."
+
+# %% [markdown]
+# ## All the models side by side (probe **and** clustering)
+# Finally, every representation compared two ways at a fixed noise level — a **supervised probe**
+# (logistic-regression accuracy) and an **unsupervised clustering** score (KMeans ARI vs the true
+# 3 types). Short version of what each is (and its real-project analogue):
+#
+# | toy model | what it is | real analogue |
+# |---|---|---|
+# | **raw genes** | the 12 gene values, no reduction | raw pseudobulk |
+# | **PCA** | top-3 principal components | PCA baseline (strong, linear) |
+# | **TF-activity (true)** | aggregate genes by the correct regulon | `dc_tfact` (graph-aware transform) |
+# | **TF-activity (rewired)** | aggregate by a scrambled graph | `dc_tfact_rewired` (biology null) |
+# | **random projection** | random 3-d linear features | `rand_proj` (dimensionality null) |
+
+# %%
+from sklearn.cluster import KMeans
+from sklearn.metrics import adjusted_rand_score
+from sklearn.preprocessing import StandardScaler
+
+Xc, yc = simulate(noise=2.0, seed=0)
+Rproj = np.random.default_rng(2).standard_normal((N_GENES, N_TF)) / np.sqrt(N_TF)
+models = {
+    "raw genes": Xc,
+    "PCA": PCA(N_TF, random_state=0).fit_transform(Xc),
+    "TF-activity (true)": tf_activity(Xc, gene_tf),
+    "TF-activity (rewired)": tf_activity(Xc, rewired_tf),
+    "random projection": Xc @ Rproj,
+}
+rows = []
+for name, rep in models.items():
+    acc = probe_acc(rep, yc)
+    km = KMeans(N_TF, random_state=0, n_init=10).fit_predict(StandardScaler().fit_transform(rep))
+    rows.append(dict(model=name, probe_accuracy=round(acc, 2),
+                     clustering_ARI=round(adjusted_rand_score(yc, km), 2)))
+res3 = pd.DataFrame(rows)
+fig = px.bar(res3.melt("model", ["probe_accuracy", "clustering_ARI"], var_name="metric", value_name="score"),
+             x="model", y="score", color="metric", barmode="group",
+             title="toy: every model, scored by supervised probe AND unsupervised clustering")
+fig.update_layout(height=440, width=820, yaxis_range=[0, 1.0])
+fig
+
+# %%
+res3.set_index("model")
+
+# %% [markdown]
+# **What it shows (and how it mirrors the real project):**
+# - **TF-activity (true graph)** is best or tied on *both* metrics — and clearly best on **clustering**
+#   (tighter groups), exactly the real-data result where the GRN-informed representation wins the
+#   unsupervised metric even when PCA wins the probe.
+# - **PCA** tops the *probe* (linear separability) but trails TF-activity on *clustering* — the same
+#   "the metric flips the winner" effect seen on the real data.
+# - The **nulls fail on both**: a rewired graph (0.49 / 0.10) and a random projection (0.64 / 0.08)
+#   collapse — so the benefit is the *specific* wiring, not just aggregation or dimension.
+#
+# The learned encoders (baseline / `grn_real` / `grn_decoder` / `grn_symmetric`, drawn above) aren't
+# trained here to keep the toy dependency-free, but they behave analogously on the real data: dense
+# beats masked, decoder-placement beats encoder, and none beats the fixed TF-activity transform.
