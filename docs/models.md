@@ -7,7 +7,22 @@ reads for cell type / disease. Two big families: **`dc_*` = the graph as a fixed
 
 Code: [`src/grn_bench/models.py`](https://github.com/sbartek/grn-prior-benchmark/blob/main/src/grn_bench/models.py) ·
 [`experiments.py`](https://github.com/sbartek/grn-prior-benchmark/blob/main/src/grn_bench/experiments.py).
-Toy visuals of the encoders: the [toy notebook](https://github.com/sbartek/grn-prior-benchmark/blob/main/notebooks/02_toy_example.ipynb).
+Interactive versions of these diagrams: the [toy notebook](https://github.com/sbartek/grn-prior-benchmark/blob/main/notebooks/02_toy_example.ipynb).
+
+---
+
+## The graph we're encoding
+
+The prior (DoRothEA) is a **signed, directed, many-to-many** network: each **transcription factor
+regulates many genes** (its regulon, ~73 on average) and each **gene is regulated by several TFs**
+(~3–4), with edges that **activate (+)** or **repress (−)**. Below is a toy cartoon — 3 TFs, 12
+genes, each gene wired to two TFs — of that structure (the real graph is ~411 TFs × 8,376 genes,
+~30k edges):
+
+![many-to-many GRN](img/toy_manytomany.png)
+
+Every model below turns a sample's gene expression into an embedding **using (or ignoring) this
+graph** — either as a *fixed transform* (`dc_*`) or as *wiring inside a neural net* (`grn_*`).
 
 ---
 
@@ -70,7 +85,16 @@ Result: `dc_tfact` **>** `dc_tfact_rewired` **>** `rand_proj` (real biology in t
 ## The GRN as a learned **encoder constraint** (`grn_*`)
 
 Same autoencoder as `baseline`, but the graph restricts the wiring — each hidden unit is a TF
-connected only to its regulon.
+connected only to its regulon. All four learned variants share the same shape
+(`genes → TF-hidden → z → TF-hidden → genes`); **only which layers the graph masks differs** (grey
+= dense/free weights; coloured = kept graph edges, red activate / blue repress):
+
+![autoencoder architectures](img/toy_nn_architectures.png)
+
+- **baseline** — dense both ways (no graph).
+- **`grn_real`** — mask the **encoder** (gene→TF).
+- **`grn_decoder`** — mask the **decoder** (TF→gene, the causal direction; see *placement* below).
+- **`grn_symmetric`** — mask **both**.
 
 ### `grn_real`
 First (encoder) layer **masked** to the DoRothEA edges: effective weight = `mask · sign ·
