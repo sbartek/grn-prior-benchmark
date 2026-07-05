@@ -65,6 +65,53 @@ def grouped_bar(df, order, conds, title, task=None, ymax=0.95):
 
 
 # %% [markdown]
+# ## Model glossary
+# | model | what it is |
+# |---|---|
+# | **PCA** | linear top-64 principal components — the strong, unsupervised, parameter-free baseline |
+# | **baseline** | dense autoencoder (no graph), 64-d bottleneck, MSE reconstruction |
+# | **dc_tfact** | decoupler ULM **TF-activity** from the DoRothEA graph — a *fixed* (non-learned) transform |
+# | **dc_tfact_collectri** | same, but the CollecTRI network (newer, broader) instead of DoRothEA |
+# | **dc_tfact_pca** | TF-activity reduced to 64 dims (dimension-matched to the others) |
+# | **rand_proj** | random linear projection at the TF dim — the "is it just dimensionality?" null |
+# | **dc_tfact_rewired** | TF-activity on a degree-preserving *rewired* DoRothEA net — the transform-side "is it biology?" null |
+# | **grn_real** | autoencoder with the **encoder** first layer masked to TF→target edges |
+# | **grn_rewired / grn_random** | same encoder mask but a corrupted graph — the "is it biology?" null |
+# | **grn_soft:λ** | dense encoder + penalty shrinking off-regulon weights (soft version of the mask) |
+# | **grn_decoder** | mask the **decoder** (TF→gene, causal direction, expiMap-style) |
+# | **grn_symmetric** | mask **both** encoder and decoder |
+
+# %% [markdown]
+# ## Consolidated comparison table
+# Cell-type macro-F1 (donor-grouped CV); last column = COVID 3-class **disease**. `NaN` = not run
+# for that model (pure controls / placement variants were only run on the primary dataset).
+
+# %%
+def _cell(df, m, c, task=None):
+    if df is None:
+        return None
+    d = df[(df.model == m) & (df.condition == c)]
+    if task and "task" in df:
+        d = d[d.task == task]
+    return round(float(d.iloc[0]["mean"]), 3) if len(d) else None
+
+
+def _prim(m, c):
+    v = _cell(final, m, c)
+    return v if v is not None else _cell(decoder, m, c)
+
+
+_models = ["pca", "baseline", "dc_tfact", "dc_tfact_collectri", "dc_tfact_pca", "rand_proj",
+           "dc_tfact_rewired", "grn_real", "grn_rewired", "grn_soft:0.001", "grn_decoder", "grn_symmetric"]
+comparison = pd.DataFrame([{
+    "model": m,
+    "prim full": _prim(m, "full"), "prim k=8": _prim(m, "lowdata:8"), "prim noise": _prim(m, "noise:0.3"),
+    "covid full": _cell(covid, m, "full", "cell_type"), "covid k=8": _cell(covid, m, "lowdata:8", "cell_type"),
+    "covid noise": _cell(covid, m, "noise:0.3", "cell_type"), "covid disease": _cell(covid, m, "full", "disease"),
+} for m in _models]).set_index("model")
+comparison
+
+# %% [markdown]
 # ## 1. Headline — the two ways to use the GRN
 # `dc_*` = TF-activity **transform** (fixed); `grn_*` = graph baked into a learned **encoder**.
 # Nulls: `rand_proj` (random features), `*_rewired` (scrambled graph).
@@ -154,6 +201,49 @@ if leakage is not None:
                  title="donor-identity leakage (kNN donor accuracy; lower = better)")
     fig.update_layout(height=360, width=680, xaxis_title="donor prediction accuracy")
     display(fig)
+
+# %% [markdown]
+# ## 8. Unsupervised check — does the embedding *cluster* by biology? (and why not DBSCAN)
+# Our probe is **supervised** (it uses labels to find a boundary). A complementary, stricter test is
+# **unsupervised clustering** of the embedding, then comparing clusters to the true cell types with
+# **ARI / NMI** (the scIB standard). This asks whether biology is the *intrinsic* geometry, not just
+# something a classifier can carve out. Below: KMeans vs DBSCAN on the PCA embedding.
+
+# %%
+import sys as _sys
+_sys.path.insert(0, str(Path.cwd().parent / "src"))
+from sklearn.cluster import DBSCAN, KMeans          # noqa: E402
+from sklearn.decomposition import PCA               # noqa: E402
+from sklearn.metrics import adjusted_rand_score as ARI, normalized_mutual_info_score as NMI  # noqa: E402
+from sklearn.preprocessing import StandardScaler    # noqa: E402
+
+from grn_bench.data import load_aligned              # noqa: E402
+
+_d = load_aligned()
+_ct = _d["obs"].cell_type.values
+_emb = StandardScaler().fit_transform(PCA(64, random_state=0).fit_transform(_d["X"]))
+_km = KMeans(15, random_state=0, n_init=10).fit_predict(_emb)
+print(f"KMeans(15):   ARI={ARI(_ct, _km):.2f}  NMI={NMI(_ct, _km):.2f}   (vs supervised probe macro-F1 ~0.87)")
+for _eps in [3, 6, 10]:
+    _db = DBSCAN(eps=_eps, min_samples=5).fit_predict(_emb)
+    _nc = len(set(_db)) - (1 if -1 in _db else 0)
+    print(f"DBSCAN eps={_eps:2d}: clusters={_nc:2d}  noise={(_db == -1).mean():.0%}  ARI={ARI(_ct, _db):.2f}")
+
+# %% [markdown]
+# **Two takeaways:**
+# 1. **Clustering (ARI ~0.19) ≪ the supervised probe (macro-F1 ~0.87).** The biology is *linearly
+#    readable* (the probe finds it) but the embedding is **not clean, well-separated balls** —
+#    related subtypes (naive/memory/effector T-cells) blur together. So a probe "rescues"
+#    separability that clustering can't recover on its own; clustering is the stricter test.
+# 2. **DBSCAN is a poor fit here.** It's density-based and very `eps`-sensitive: too small → a third
+#    of points labelled *noise*; slightly larger → everything collapses into **one** blob
+#    (ARI ~0.01). Single-cell embeddings have imbalanced, variable-density, high-dimensional
+#    clusters — exactly DBSCAN's weak spot. The field uses **graph-based clustering (Leiden/Louvain
+#    on a kNN graph)** + ARI/NMI (scIB), not DBSCAN. KMeans is a reasonable quick proxy; DBSCAN is
+#    not.
+#
+# So: yes, unsupervised clustering is a sensible *complementary* evaluation (and a good next step to
+# add per-model ARI/NMI), but pick Leiden/KMeans over DBSCAN for this data.
 
 # %% [markdown]
 # ## Verdict
