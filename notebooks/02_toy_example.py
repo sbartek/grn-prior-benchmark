@@ -264,6 +264,37 @@ fig.update_yaxes(tickvals=list(range(N_TF)), ticktext=[f"TF{t}" for t in range(N
 fig.update_xaxes(title_text="gene")
 fig
 
+# %% [markdown]
+# Same thing as a **node-link graph** (compare to the clean one at the top): now every gene has
+# **two** edges — a solid **red** primary activator and a thinner **secondary** edge that is red
+# (activating, +0.5) or **blue** (repressing, −0.5). This is the many-to-many, signed picture.
+
+# %%
+tf_y = np.linspace(0, 1, N_TF)
+gene_y = np.linspace(0, 1, N_GENES)
+fig = go.Figure()
+for t in range(N_TF):
+    for g in range(N_GENES):
+        w = W_tangled[t, g]
+        if w == 0:
+            continue
+        fig.add_trace(go.Scatter(
+            x=[0, 1], y=[tf_y[t], gene_y[g]], mode="lines", hoverinfo="none", showlegend=False,
+            line=dict(color=("crimson" if w > 0 else "royalblue"), width=3 if abs(w) == 1 else 1.2)))
+# legend proxies for edge meaning
+fig.add_trace(go.Scatter(x=[None], y=[None], mode="lines", line=dict(color="crimson"), name="activates (+)"))
+fig.add_trace(go.Scatter(x=[None], y=[None], mode="lines", line=dict(color="royalblue"), name="represses (−)"))
+fig.add_trace(go.Scatter(x=[0] * N_TF, y=tf_y, mode="markers+text",
+                         text=[f"TF{t}" for t in range(N_TF)], textposition="middle left",
+                         marker=dict(size=30, color=[PAL[t] for t in range(N_TF)]), showlegend=False))
+fig.add_trace(go.Scatter(x=[1] * N_GENES, y=gene_y, mode="markers+text",
+                         text=[f"g{g}" for g in range(N_GENES)], textposition="middle right",
+                         marker=dict(size=16, color=[PAL[t] for t in gene_tf]), showlegend=False))
+fig.update_layout(title="tangled toy GRN: overlapping + signed edges (each gene → 2 TFs)",
+                  height=500, width=600, xaxis=dict(visible=False, range=[-0.25, 1.25]),
+                  yaxis=dict(visible=False))
+fig
+
 # %%
 def sim_from_W(W, noise, n_per_type=60, seed=0):
     r = np.random.default_rng(seed)
