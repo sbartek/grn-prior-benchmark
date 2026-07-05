@@ -99,4 +99,32 @@ draw(axes[1, 1], True, True, "grn_symmetric: BOTH masked")
 fig.suptitle("Autoencoders on the toy:  genes(12) → TF(3) → z(2) → TF(3) → genes(12) "
              "— only the coloured (graph) edges differ", fontsize=11)
 fig.tight_layout(); fig.savefig(IMG / "toy_nn_architectures.png", dpi=130); plt.close(fig)
-print("wrote toy_manytomany.png, toy_nn_architectures.png")
+
+# ---- the winner: dc_tfact = a FIXED 2-layer transform (genes -> TF-activity) ----
+fig, ax = plt.subplots(figsize=(6.5, 4.6))
+gy = np.linspace(0.05, 0.95, N_GENES)
+ty = np.linspace(0.2, 0.8, N_TF)
+for t in range(N_TF):
+    for g in range(N_GENES):
+        w = W[t, g]
+        if w == 0:
+            continue
+        ax.plot([0, 1], [gy[g], ty[t]], color="crimson" if w > 0 else "royalblue",
+                lw=2.0 if abs(w) == 1 else 1.0, alpha=0.75, zorder=1)
+ax.scatter([0] * N_GENES, gy, s=140, c=[PAL[t] for t in gene_tf], zorder=2)
+for g in range(N_GENES):
+    ax.text(-0.05, gy[g], f"g{g}", ha="right", va="center", fontsize=8)
+ax.scatter([1] * N_TF, ty, s=700, c=PAL, zorder=2)
+for t in range(N_TF):
+    ax.text(1.06, ty[t], f"TF{t} activity", ha="left", va="center", fontweight="bold", fontsize=9)
+ax.text(0, 1.05, "genes (12)", ha="center", fontsize=10)
+ax.text(1, 0.95, "TF-activity (3)\n= the embedding", ha="center", fontsize=10)
+ax.text(0.5, -0.08, "weights FIXED by the graph (no training) · output IS the embedding "
+        "(no z, no decoder)", ha="center", fontsize=9, style="italic")
+ax.legend([Line2D([0], [0], color="crimson", lw=2), Line2D([0], [0], color="royalblue", lw=2)],
+          ["activates (+)", "represses (−)"], loc="upper center", ncol=2, fontsize=8,
+          bbox_to_anchor=(0.5, -0.12), frameon=False)
+ax.set_xlim(-0.35, 1.6); ax.set_ylim(-0.2, 1.1); ax.axis("off")
+ax.set_title("dc_tfact (the winner): a fixed genes → TF-activity transform", pad=12)
+fig.tight_layout(); fig.savefig(IMG / "toy_tfact_transform.png", dpi=130); plt.close(fig)
+print("wrote toy_manytomany.png, toy_nn_architectures.png, toy_tfact_transform.png")

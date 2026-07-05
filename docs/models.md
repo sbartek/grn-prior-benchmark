@@ -47,6 +47,16 @@ Here the graph isn't learned — it's used as arithmetic to turn expression into
 (how active each transcription factor is, inferred from its target genes). This is the classical,
 `decoupler`/SCENIC way of using a regulatory network.
 
+Its "architecture" is the simplest possible — **one fixed layer** (`genes → TF-activity`), with the
+weights **set by the graph, not learned**, and the output *is* the embedding (no bottleneck, no
+decoder). It's the encoder's first masked layer with its weights frozen to the biology and
+everything after it removed:
+
+![dc_tfact fixed transform](img/toy_tfact_transform.png)
+
+Because there's nothing to train, there's nothing to overfit — which is a big part of why it's
+robust exactly when data is scarce.
+
 ### `dc_tfact`
 decoupler **ULM** TF-activity using DoRothEA: a per-sample signed weighted sum over each TF's
 regulon → one number per TF (293 dims). Fully fixed, no training. **The one graph method that
