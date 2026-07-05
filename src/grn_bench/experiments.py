@@ -110,14 +110,23 @@ def make_embedder(spec, data, train_idx, device, seed, epochs, X_input, z_dim=64
     # soft prior: dense first layer + penalty pulling off-regulon weights to 0 (spec 'grn_soft[:lam]')
     soft_mask = None
     soft_lambda = 0.0
-    mask = sign = None
+    mask = sign = dec_mask = dec_sign = None
+    # decoder-masked (expiMap-style) / symmetric graph priors: grn_decoder[/_rewired], grn_symmetric[/_rewired]
+    DEC_SPECS = {"grn_decoder": "real", "grn_decoder_rewired": "rewired",
+                 "grn_symmetric": "real", "grn_symmetric_rewired": "rewired"}
     if spec.startswith("grn_soft"):
         soft_lambda = float(spec.split(":")[1]) if ":" in spec else 1e-3
         soft_mask, _ = M.build_mask(data["graph"], "real", genes, n_hidden, device)
+    elif spec in DEC_SPECS:
+        m, s = M.build_mask(data["graph"], DEC_SPECS[spec], genes, n_hidden, device)
+        dec_mask, dec_sign = m.t().contiguous(), s.t().contiguous()   # TF->gene = transpose
+        if spec.startswith("grn_symmetric"):
+            mask, sign = m, s                                          # also mask the encoder
     elif spec != "baseline":
         variant = spec.replace("grn_", "")
         mask, sign = M.build_mask(data["graph"], variant, genes, n_hidden, device)
-    model = M.AutoEncoder(n_genes, n_hidden, z_dim, mask=mask, sign=sign)
+    model = M.AutoEncoder(n_genes, n_hidden, z_dim, mask=mask, sign=sign,
+                          dec_mask=dec_mask, dec_sign=dec_sign)
 
     rng = np.random.default_rng(seed)
     if early_stop:

@@ -47,15 +47,17 @@ class MaskedLinear(nn.Module):
 
 class AutoEncoder(nn.Module):
     def __init__(self, n_genes: int, n_hidden: int, z_dim: int,
-                 mask: torch.Tensor | None = None, sign: torch.Tensor | None = None):
+                 mask: torch.Tensor | None = None, sign: torch.Tensor | None = None,
+                 dec_mask: torch.Tensor | None = None, dec_sign: torch.Tensor | None = None):
         super().__init__()
-        if mask is None:                            # dense baseline first layer
-            self.enc1 = nn.Linear(n_genes, n_hidden)
-        else:                                       # graph-masked first layer
-            self.enc1 = MaskedLinear(n_genes, n_hidden, mask, sign)
+        # enc1 gene->TF (encoder mask); dec2 TF->gene (decoder mask, expiMap-style = the causal
+        # generative direction). Masking either/both gives encoder-only / decoder-only / symmetric.
+        self.enc1 = MaskedLinear(n_genes, n_hidden, mask, sign) if mask is not None \
+            else nn.Linear(n_genes, n_hidden)
         self.to_z = nn.Linear(n_hidden, z_dim)
         self.dec1 = nn.Linear(z_dim, n_hidden)
-        self.dec2 = nn.Linear(n_hidden, n_genes)
+        self.dec2 = MaskedLinear(n_hidden, n_genes, dec_mask, dec_sign) if dec_mask is not None \
+            else nn.Linear(n_hidden, n_genes)
 
     def encode(self, x):
         return self.to_z(F.relu(self.enc1(x)))
