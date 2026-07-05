@@ -22,16 +22,34 @@ uv pip install -r requirements.txt
 
 ## Run
 
+Primary dataset pipeline (each script writes to `data/`, gitignored):
+
 ```bash
-# 1. fetch + cache the CELLxGENE subset  (writes to data/, gitignored)
-uv run python scripts/00_fetch_data.py
-# 2. build pseudobulk (donor x cell_type)
-uv run python scripts/01_build_pseudobulk.py
-# 3. build DoRothEA adjacency + graph controls
-uv run python scripts/02_build_graph.py
-# 4. run baseline vs GRN encoders + stress sweeps -> results/
-uv run python scripts/03_run_experiments.py
+uv run python scripts/00_fetch_data.py            # fetch + cache the CELLxGENE RA PBMC subset
+uv run python scripts/01_build_pseudobulk.py      # pseudobulk (donor x cell_type)
+uv run python scripts/02_build_graph.py           # DoRothEA adjacency + graph controls
+uv run python scripts/11_final.py                 # DEFINITIVE sweep -> results/tables/final.csv
+uv run python scripts/04_make_figures.py          # all figures -> results/figures/
 ```
+
+Supplementary sweeps (optional, reproduce specific figures/tables):
+
+```bash
+uv run python scripts/05_density_ablation.py      # DoRothEA confidence A/AB/ABC + rewired-A
+uv run python scripts/10_bottleneck.py            # bottleneck-dim sensitivity (z=32/64/128)
+```
+
+Second dataset (external validity — COVID PBMC; re-run 00/01/02 with the covid args first):
+
+```bash
+uv run python scripts/00_fetch_data.py 2a498ace-872a-4935-984b-1afa70fd9886 data/covid_raw.h5ad
+uv run python scripts/01_build_pseudobulk.py data/covid_raw.h5ad data/covid_pseudobulk.h5ad
+uv run python scripts/02_build_graph.py data/covid_pseudobulk.h5ad data/covid_graph.npz
+uv run python scripts/08_second_dataset.py        # cell type + 3-class disease -> results/tables/covid.csv
+```
+
+> Note: `dc.op.dorothea/collectri` are fetched live at runtime (not version-pinned); the CELLxGENE
+> census is pinned to `2025-11-08`. Numbers are near-deterministic but not bit-reproducible (MPS).
 
 ## Notebook
 `notebooks/01_eda_suitability.ipynb` — narrative EDA + dataset-suitability check (composition,
@@ -52,4 +70,6 @@ renders offline in any browser).
 `memo/` write-up. Full design rationale in `PLAN.md`; findings in `memo/memo.md`.
 
 ## Status
-Scaffold + plan. Implementation in progress — see `PLAN.md` §7 for the timeline.
+Complete. Runnable pipeline + baseline/GRN encoders + TF-activity arms, full sweeps, EDA
+notebook, and a ~2-page memo (`memo/memo.md`). Post-submission critical review and fixes logged in
+`PLAN.md` §14; literature context in `references.md`.
