@@ -339,6 +339,64 @@ fig
 # why the fully-scrambled `rewired` graph above fails outright — the extreme of a wrong graph.)
 
 # %% [markdown]
+# ## What the neural-net encoders look like (the learned models)
+# The comparisons above used the *fixed* TF-activity transform. The real project also has **learned
+# autoencoders** — a **baseline** (dense first layer) and a **graph-masked** one (`grn_real`) whose
+# first layer *is* the graph. On the toy (12 genes → 3 TF-hidden → z=2 → decode back) the only
+# difference is the **first layer's wiring**, drawn below. Grey = unconstrained dense weights;
+# red/blue = graph edges kept by the mask (activate / repress).
+
+# %%
+def draw_ae(mode, W=None, title=""):
+    sizes = [N_GENES, N_TF, 2, N_TF, N_GENES]
+    xs = [0, 1, 2, 3, 4]
+    ys = [np.linspace(0.05, 0.95, s) for s in sizes]
+    fig = go.Figure()
+    gx, gy = [], []
+    layers_dense = [1, 2, 3] if mode != "dense" else [0, 1, 2, 3]   # baseline: layer 0 also dense
+    for li in layers_dense:
+        for a in range(sizes[li]):
+            for b in range(sizes[li + 1]):
+                gx += [xs[li], xs[li + 1], None]; gy += [ys[li][a], ys[li + 1][b], None]
+    fig.add_trace(go.Scatter(x=gx, y=gy, mode="lines", line=dict(color="lightgray", width=0.5),
+                             hoverinfo="none", showlegend=False))
+    if mode == "masked":                                            # colored, signed first layer
+        for sgn, color, name in [(1, "crimson", "activates (+)"), (-1, "royalblue", "represses (−)")]:
+            ex, ey = [], []
+            for t in range(N_TF):
+                for g in range(N_GENES):
+                    if W[t, g] != 0 and np.sign(W[t, g]) == sgn:
+                        ex += [xs[0], xs[1], None]; ey += [ys[0][g], ys[1][t], None]
+            if ex:
+                fig.add_trace(go.Scatter(x=ex, y=ey, mode="lines", line=dict(color=color, width=1.6),
+                                         hoverinfo="none", name=name))
+    names = ["genes (12)", "TF hidden (3)", "z (2)", "TF hidden (3)", "genes out (12)"]
+    for li in range(5):
+        fig.add_trace(go.Scatter(x=[xs[li]] * sizes[li], y=ys[li], mode="markers",
+                                 marker=dict(size=11, color="#555"), hoverinfo="none", showlegend=False))
+    fig.update_layout(title=title, height=440, width=720,
+                      xaxis=dict(tickvals=xs, ticktext=names, range=[-0.5, 4.5]),
+                      yaxis=dict(visible=False))
+    return fig
+
+
+draw_ae("dense", title="baseline autoencoder: DENSE first layer (every gene → every TF unit)")
+
+# %%
+draw_ae("masked", W_clean, title="grn_real (clean graph): first layer MASKED to TF→target edges")
+
+# %%
+draw_ae("masked", W_tangled, title="grn_real (tangled graph): masked + signed, overlapping regulons")
+
+# %% [markdown]
+# The baseline's first layer is a full mesh (grey) — ~36 free weights on the toy (~3.4M on the real
+# data). The masked encoder keeps only the graph's edges (12 on the clean toy, coloured by sign);
+# everything downstream (TF-hidden → z → decode) is identical. So "graph-aware encoder" literally
+# means **delete the first-layer connections that aren't regulatory edges**. On the real data this
+# constraint *hurt* — the mesh, though it overfits, still beat the mask, and a rewired mask did as
+# well as the real one.
+
+# %% [markdown]
 # ## Takeaway (maps directly to the real project)
 # - A GRN prior used as a **feature transform** (aggregate co-regulated genes) buys **robustness to
 #   noise** — exactly the "helps most when data is degraded / scarce" result on the real data.
