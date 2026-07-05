@@ -125,6 +125,12 @@ as unrelated. That injected knowledge is the **"GRN prior."**
 **scRNA-seq** (single-cell RNA sequencing) counts mRNA per gene *in each individual cell* —
 giving a big `cells × genes` matrix (our dataset: ~108k cells × ~20k genes).
 
+> **How the counts are made:** the pipeline is *library prep* (tag each mRNA with a **UMI** +
+> cell barcode) → *sequencing* (read the letters) → *alignment* (match each read to its gene) →
+> **quantification / UMI counting** (tally distinct molecules per gene per cell). The dataset
+> stores the final **counts**, not the sequences — the letters are used upstream to identify and
+> count, then discarded. The whole field is **transcriptomics**; here the assay is 10x 3′ v3.
+
 The catch: each cell is measured **shallowly**, so a gene that's truly active often reads **0**
 by chance. That's **dropout** — a measurement failure, not biological silence. Single cells are
 sparse and noisy.
