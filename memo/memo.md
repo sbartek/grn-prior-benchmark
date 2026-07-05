@@ -99,6 +99,16 @@ soft-prior > hard-mask holds in every condition, and `grn_real` is *always* wors
 bottleneck helps the hard mask (full: 0.67 → 0.71 → 0.75) but it never reaches the baseline
 (≈0.79) — so the negative-for-constraints result is not a z=64 tuning artifact.
 
+## Where to place the prior — encoder vs decoder vs symmetric
+The masked encoder infers TF activity from genes (the *inverse* direction); the **decoder**
+(TF→gene) is the *causal/generative* direction and is where biologically-informed autoencoders
+(expiMap) put the mask. Testing all three (full-data cell type): **grn_decoder 0.738 > grn_real
+(encoder) 0.704 > grn_symmetric 0.675** (masking both over-constrains). In *every* placement the
+real graph beats its rewired control (decoder 0.738 vs 0.715; encoder 0.704 vs 0.661) — a genuine,
+if modest, biology signal. But **none beats the dense baseline (0.785) or PCA (0.869)**. So a
+better-placed prior helps *relative to other constrained models*, yet still doesn't beat doing
+nothing — reinforcing the main conclusion. (`13_decoder_prior.py`, `decoder.csv`.)
+
 ## Interpretation
 The GRN is not useless — as a TF-activity transform it encodes real regulatory signal and gives a
 genuine low-data/regularization benefit (stronger with CollecTRI). But it is **not more
