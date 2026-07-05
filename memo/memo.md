@@ -15,19 +15,27 @@ reference live on the project site:*
 ## TL;DR
 
 We tested whether a public gene-regulatory-network prior (DoRothEA) makes RNA-expression embeddings
-better at capturing biology. The answer is a clear, useful **"it depends — and here's exactly on
-what"**:
+better at capturing biology. Bottom line:
 
-- **Don't** bake the graph into a deep encoder as a hard constraint — it consistently *hurts*, and
-  a scrambled graph does just as well (so it was never the biology).
-- **Do** use the graph the classical way — as a **TF-activity feature transform**. That carries
-  genuine biological signal and **wins specifically when data is scarce** (the regime priors are
-  supposed to help).
-- **The winner depends on the metric.** A plain PCA baseline wins the standard supervised test, but
-  the graph-informed representations win the stricter *unsupervised clustering* test.
-- **Net recommendation:** if you reach for a GRN prior, apply it as a fixed transform (and prefer
-  **CollecTRI** over DoRothEA), and expect it to earn its keep mainly in **low-data** settings — not
-  as a network baked into a large model, where a simple baseline is hard to beat.
+- **The winner: DoRothEA TF-activity** — the graph used the classical way, as a fixed feature
+  transform (how active each transcription factor is). It carries genuine biological signal (beats
+  scrambled-graph and random controls), **wins when data is scarce**, and forms the **tightest,
+  most biologically-clustered** embedding. It's also interpretable — each dimension is a named TF.
+  *(A newer public network, CollecTRI, does the same thing a bit better; included only as a
+  robustness check — see Scope.)*
+
+- **The catch — PCA.** A plain PCA baseline is remarkably strong: it **ties or beats** the prior on
+  the standard **supervised** test, and it's trivially simple (no graph, no external tool). So use
+  **PCA as the default when data is plentiful**, and switch to **TF-activity when data is scarce or
+  you want interpretable / well-clustered biology**. And note PCA's own weakness: it **loses** the
+  stricter **unsupervised clustering** test — the winner literally depends on which metric you pick.
+
+- **The clear loser: baking the graph into a deep encoder** (as a hard or soft mask). It's *below*
+  both PCA and a plain autoencoder everywhere, and a scrambled graph does just as well — so that
+  effect was regularization, never the biology. Don't do this.
+
+*In one line: use the GRN as a TF-activity transform (great in low-data, interpretable), keep PCA
+as the simple default, and never bake the graph into a large model.*
 
 ---
 
@@ -54,6 +62,13 @@ stress it under low data and noise, and — crucially — we run **scrambled-gra
 tell *real biology* apart from *any old structure*. (Dataset is well-suited: balanced disease, no
 sex/assay confounds; the one catch is that disease is tied to donor identity, so we treat cell type
 as the trustworthy readout. Details: [EDA notebook](https://github.com/sbartek/grn-prior-benchmark/blob/main/notebooks/01_eda_suitability.ipynb).)
+
+**Scope & assumptions.** The exercise specifies the **DoRothEA** TF–target network — that is the
+required and **primary** network here; all headline results use it. I additionally ran **CollecTRI**
+(a newer public TF→target network from the same tool/lab, *not* a curated pathway gene set, so not
+in the excluded list) purely as a **robustness check** — to test whether the effect is
+DoRothEA-specific. It is supporting evidence, not the load-bearing result: every conclusion holds on
+DoRothEA alone.
 
 ## The story of what we found
 
