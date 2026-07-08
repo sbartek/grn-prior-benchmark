@@ -271,6 +271,50 @@ if clustering is not None:
 # here they disagree.
 
 # %% [markdown]
+# ### Seeing the clusters — PCA vs TF-activity
+# Project two embeddings to 2-D (UMAP) so we can *look* at the structure the ARI numbers summarise.
+# We colour by **true cell type** (does biology form blobs?) and by the **KMeans cluster** the
+# algorithm found (do the found clusters match biology?).
+
+# %%
+from grn_bench.experiments import compute_tfact       # noqa: E402
+import umap                                            # noqa: E402
+
+_embs = {
+    "PCA-64": StandardScaler().fit_transform(PCA(64, random_state=0).fit_transform(_d["X"])),
+    "dc_tfact (DoRothEA)": StandardScaler().fit_transform(compute_tfact(_d, "dorothea")),
+}
+_parts = []
+for _name, _E in _embs.items():
+    _u = umap.UMAP(n_neighbors=15, min_dist=0.3, random_state=0).fit_transform(_E)
+    _cl = KMeans(15, random_state=0, n_init=10).fit_predict(_E)
+    _parts.append(pd.DataFrame({"UMAP1": _u[:, 0], "UMAP2": _u[:, 1], "cell type": _d["obs"].cell_type.values,
+                                "KMeans cluster": _cl.astype(str), "embedding": _name}))
+_viz = pd.concat(_parts, ignore_index=True)
+
+# %%
+fig = px.scatter(_viz, x="UMAP1", y="UMAP2", color="cell type", facet_col="embedding", opacity=0.75,
+                 title="UMAP coloured by TRUE cell type — dc_tfact forms tighter cell-type groups than PCA")
+fig.update_traces(marker_size=5); fig.update_xaxes(showticklabels=False); fig.update_yaxes(showticklabels=False)
+fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
+fig.update_layout(height=520, width=1000, legend=dict(font_size=8, itemsizing="constant"))
+fig
+
+# %%
+fig = px.scatter(_viz, x="UMAP1", y="UMAP2", color="KMeans cluster", facet_col="embedding", opacity=0.75,
+                 title="UMAP coloured by the KMeans cluster found (label-free)")
+fig.update_traces(marker_size=5); fig.update_xaxes(showticklabels=False); fig.update_yaxes(showticklabels=False)
+fig.for_each_annotation(lambda a: a.update(text=a.text.split("=")[-1]))
+fig.update_layout(height=520, width=1000, showlegend=False)
+fig
+
+# %% [markdown]
+# In the top plot, **dc_tfact** separates the cell types into cleaner blobs than **PCA** (whose
+# groups are more elongated/overlapping) — the visual reason its clustering ARI is higher. In the
+# bottom plot you can see which groups KMeans actually recovers (and where it splits/merges the
+# harder, similar T-cell subtypes).
+
+# %% [markdown]
 # ## Verdict
 # - **How you use the GRN matters more than whether you use it.** As a learned-**encoder**
 #   constraint it hurts (rewired ≈ real → regularization, not biology). As a **TF-activity
