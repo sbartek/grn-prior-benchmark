@@ -235,6 +235,87 @@ fig.update_layout(height=640, width=820)
 fig
 
 # %% [markdown]
+# ## What ULM actually does (behind the "mean of targets")
+#
+# The toy above uses **mean of a TF's target genes** as its activity — a clean intuition, and in
+# this signless toy it's essentially what real ULM computes. The **real** ULM in `decoupler` is a
+# tiny **signed univariate linear regression per (sample, TF)**:
+#
+# For each sample `s` and TF `k`:
+#
+# 1. Build a **signed indicator** `x[gene]`: `+1` if gene is an activator target, `−1` if repressor,
+#    `0` otherwise.
+# 2. Fit `y = a + b·x`, where `y` is the sample's expression vector.
+# 3. Report the **t-statistic of `b`** — that number is the ULM score for (sample, TF).
+#
+# Higher t-stat → the sample's expression pattern matches the TF's regulon more sharply → the TF
+# is inferred more active. Below: one sample × one TF walked through, step by step.
+
+# %%
+from scipy import stats
+
+Xn, yn = simulate(noise=1.5, seed=0)
+sample_idx = 5                          # this sample is cell-type 0 (TF0-driven)
+tf_of_interest = 0
+
+y_expression = Xn[sample_idx]                                          # length 12
+x_indicator  = (gene_tf == tf_of_interest).astype(float)               # +1 for TF0's 4 targets, 0 else
+
+slope, intercept, r_value, p_value, std_err = stats.linregress(x_indicator, y_expression)
+t_stat = slope / std_err
+
+print(f"sample {sample_idx} (true type = {yn[sample_idx]}), TF{tf_of_interest} activity:")
+print(f"  slope b   = {slope:.3f}   (targets are {slope:.2f} higher on average)")
+print(f"  std_err   = {std_err:.3f}")
+print(f"  t-stat    = {t_stat:.3f}   <-- this is dc_tfact[sample_5, TF0]")
+
+# %%
+rng = np.random.default_rng(0)
+jitter = rng.normal(0, 0.03, len(x_indicator))
+colors = ["#e41a1c" if xi > 0 else "#888" for xi in x_indicator]
+
+fig = go.Figure()
+fig.add_trace(go.Scatter(
+    x=x_indicator + jitter, y=y_expression, mode="markers",
+    marker=dict(size=14, color=colors, line=dict(color="black", width=1)),
+    text=[f"g{i}" for i in range(N_GENES)],
+    hovertemplate="%{text}<br>x=%{x:.2f}  y=%{y:.2f}<extra></extra>",
+    name="genes",
+))
+xs = np.array([-0.15, 1.15])
+fig.add_trace(go.Scatter(x=xs, y=intercept + slope * xs, mode="lines",
+                         line=dict(color="black", width=2, dash="solid"),
+                         name=f"fitted:  y = {intercept:.2f} + {slope:.2f}·x"))
+fig.update_layout(
+    title=f"ULM — sample {sample_idx} × TF0<br>"
+          f"<sub>b = {slope:.2f},  std_err = {std_err:.2f},  t-stat = {t_stat:.2f}  → TF0 activity</sub>",
+    xaxis=dict(title="signed indicator  x[gene]  (+1 = TF0 target, 0 = not)",
+               tickvals=[0, 1], range=[-0.3, 1.3]),
+    yaxis=dict(title="expression  y[gene]"),
+    height=460, width=640, showlegend=True,
+)
+fig
+
+# %% [markdown]
+# **How to read the plot:**
+#
+# - Red dots = TF0's 4 target genes (`x = +1`). In a type-0 sample, their expression is elevated (top-right).
+# - Grey dots = non-targets (`x = 0`). Their expression is centered near zero (bottom-left).
+# - The **fitted line** captures the average lift from `x = 0` to `x = 1` — that slope `b` is how
+#   much higher targets are than non-targets in this sample.
+# - Divide by the standard error of the slope → **t-statistic**. That number IS the ULM score for
+#   this (sample, TF) pair.
+#
+# **Same math on the real project**: for each of 500 pseudobulk samples and each of ~293 TFs, this
+# regression fires. Output: a `500 × 293` TF-activity matrix. No training, no seed dependence, no
+# leakage — every sample is transformed independently. That matrix is `dc_tfact`.
+#
+# **When repressors matter:** in this toy, all edges are activators, so `x` is 0/1. Once we add
+# repressors (next section), `x` takes values in `{−1, 0, +1}` — the regression then rewards
+# expression patterns where **activators are up AND repressors are down simultaneously**, which is
+# the sharper "biological consistency" test.
+
+# %% [markdown]
 # ## From cartoon to reality: overlapping regulons + repressors
 # So far each gene had **one** activating TF — a clean partition. Real GRNs are **many-to-many**:
 # a TF regulates ~73 genes, a gene is regulated by ~3–4 TFs, and many edges **repress** (−1). We
@@ -337,6 +418,79 @@ fig
 # graph is a noisy, partial estimate — together these are a big part of *why* the prior's benefit is
 # modest and shows up mainly in the low-data / high-noise regime rather than everywhere. (And it's
 # why the fully-scrambled `rewired` graph above fails outright — the extreme of a wrong graph.)
+
+# %% [markdown]
+# ## ULM on the tangled (signed) graph — one worked example
+#
+# Now the same regression trick from earlier, but with **signed weights**. Every gene has an edge to
+# TF0 that's `+1` (primary activator), `−0.5` (weak repressor), `+0.5` (weak activator), or `0`
+# (not connected). The predictor `x` is no longer a clean 0/1 indicator — it takes values from
+# `W_tangled[TF0]`. The regression now rewards samples where **activators are up AND repressors are
+# down simultaneously** — a sharper "biological consistency" test than mean-of-targets.
+
+# %%
+Xn_tangled, yn_tangled = sim_from_W(W_tangled, noise=1.5, seed=0)
+sample_idx_t = 5                                # type-0 sample (TF0 active)
+tf_t = 0
+
+y_t = Xn_tangled[sample_idx_t]                  # length 12
+x_t = W_tangled[tf_t]                           # signed weights: +1 / −0.5 / +0.5 / 0
+
+slope_t, intercept_t, _, _, se_t = stats.linregress(x_t, y_t)
+t_stat_t = slope_t / se_t
+
+print(f"sample {sample_idx_t} (true type = {yn_tangled[sample_idx_t]}), TF{tf_t} tangled activity:")
+print(f"  x_t = {x_t}")
+print(f"  slope b   = {slope_t:.3f}")
+print(f"  std_err   = {se_t:.3f}")
+print(f"  t-stat    = {t_stat_t:.3f}   <-- dc_tfact[sample_5, TF0] using tangled graph")
+
+# %%
+# color: activators red, repressors blue, non-targets grey; size proportional to |weight|
+def _col(w):
+    return "#e41a1c" if w > 0 else ("#377eb8" if w < 0 else "#888")
+colors_t = [_col(w) for w in x_t]
+sizes_t = [8 + 12 * abs(w) for w in x_t]
+
+fig = go.Figure()
+fig.add_trace(go.Scatter(
+    x=x_t + np.random.default_rng(1).normal(0, 0.015, len(x_t)),
+    y=y_t, mode="markers",
+    marker=dict(size=sizes_t, color=colors_t, line=dict(color="black", width=1)),
+    text=[f"g{i} (w={w:+.1f})" for i, w in enumerate(x_t)],
+    hovertemplate="%{text}<br>x=%{x:.2f}  y=%{y:.2f}<extra></extra>",
+    name="genes",
+))
+xs_t = np.array([x_t.min() - 0.15, x_t.max() + 0.15])
+fig.add_trace(go.Scatter(x=xs_t, y=intercept_t + slope_t * xs_t, mode="lines",
+                         line=dict(color="black", width=2),
+                         name=f"fitted:  y = {intercept_t:.2f} + {slope_t:.2f}·x"))
+fig.update_layout(
+    title=f"ULM on tangled graph — sample {sample_idx_t} × TF0<br>"
+          f"<sub>x = signed regulon weight; b = {slope_t:.2f},  t-stat = {t_stat_t:.2f}</sub>",
+    xaxis=dict(title="signed weight  x[gene]  from W_tangled[TF0]  (red = +, blue = −, size ∝ |w|)"),
+    yaxis=dict(title="expression  y[gene]"),
+    height=460, width=680, showlegend=True,
+)
+fig
+
+# %% [markdown]
+# **How to read this:**
+#
+# - Red dots = activators of TF0 (positive `x`); their expression should be elevated in a type-0 sample.
+# - Blue dots = repressors of TF0 (negative `x`); their expression should be *lower* than average.
+# - Dot size = strength of the edge (|weight|).
+# - The fitted line's slope `b` measures: *do y-values track the signed regulon pattern?*
+#   Positive `b` means yes — activators up AND repressors down, exactly what a type-0 sample should show.
+#
+# **Why the signed version is stronger than mean-of-targets:**
+# A pure activator-mean would count a highly-expressed repressor as evidence FOR the TF (wrong).
+# Signed ULM penalises that: a high-expression repressor sits at low `x`, pulling the slope *down*.
+# You need the whole regulon pattern to align.
+#
+# **What happens if the graph is wrong.** If we replaced `W_tangled` with `W_clean` (the incomplete
+# graph that misses secondary edges), the signed cross-talk terms are set to zero → the regression
+# has less discriminating power. That's the orange line in the plot above.
 
 # %% [markdown]
 # ## What the neural-net encoders look like (the learned models)
