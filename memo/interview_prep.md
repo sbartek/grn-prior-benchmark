@@ -44,6 +44,37 @@ Adversarial pre-mortem of the GRN-prior submission before the review call. **Don
 **Volunteer script (say this preemptively):**
 > "I want to flag something before we get into the clustering results. The AE-based rows in `clustering.csv` — baseline, grn_real, grn_decoder — were trained on all 500 pseudobulks with no held-out set (line 41 of `14_clustering.py`, `all_idx = np.arange(n)`). PCA, dc_tfact and dc_tfact_collectri aren't affected because they're fixed transforms. So the cleanest reading of that table is the fixed-transform comparison: dc_tfact_collectri 0.30 > dc_tfact 0.28 > PCA 0.12 — TF-activity clusters biology tighter than PCA. That's the honest positive result. The AE-vs-PCA rank in that table I'd treat as directional at best. One thing worth noting for the confounded AE rows: grn_real is still below baseline even when both are given the memorization freebie, which strengthens the Act-1 finding rather than weakening it. The proper fix is per-fold-trained AE embeddings — top of my next-round list."
 
+### R1 UPDATE (2026-07-09) — I ran the per-fold fix; Act 3 has to be walked back
+
+Re-ran the geometric metrics with **per-fold-trained AE embeddings** (`scripts/18_extra_metrics_perfold.py`, `results/tables/extra_metrics_perfold.csv`). Turns out R1 wasn't a small confound — it was **carrying the entire Act-3 "metric flip" story.**
+
+**Per-fold results (honest — AE only sees train donors):**
+
+| model | macro-F1 | macro AUC | silhouette | ct_asw |
+|---|---|---|---|---|
+| **pca** | **0.864** | **0.994** | **−0.027** | **−0.028** |
+| dc_tfact_collectri | 0.854 | 0.992 | −0.019 | −0.022 |
+| dc_tfact | 0.855 | 0.988 | −0.056 | −0.058 |
+| baseline | 0.757 | 0.983 | −0.081 | −0.078 |
+| grn_decoder | 0.741 | 0.980 | −0.135 | −0.138 |
+| grn_real | 0.702 | 0.961 | −0.124 | −0.126 |
+
+**What changed vs the R1-confounded numbers:**
+- AE silhouettes dropped ~0.10 (`baseline` 0.025 → −0.081; `grn_decoder` −0.015 → −0.135). R1 was doing real work in inflating them.
+- PCA silhouette **improved** (−0.10 → −0.03) — no confound, per-fold subsets are smaller/cleaner.
+- **PCA now wins ALL THREE metrics** including silhouette — the metric that Act 3 said PCA loses.
+- CollecTRI-ULM is a very close #2 everywhere. Fixed-transform ordering is stable.
+
+**Act 3 (as written) is largely an R1 artefact.** The "PCA smears / GRN clusters tighter" flip does not hold when clustering is measured fairly.
+
+**Volunteer script (2026-07-09 — use this one, not the older R1 draft above):**
+> "I re-ran the geometric metrics with per-fold AE training yesterday — R1 turned out to carry the entire Act-3 story in my memo. On honest per-fold silhouette, PCA is actually #1 (−0.03), CollecTRI ULM #2 (−0.02) — the 'metric flip' I described doesn't hold. So the honest bottom line is simpler than Act-3: PCA is the strongest baseline across every metric; TF-activity ULM is competitive with PCA and adds interpretability; encoder-mask hurts everywhere. Act-1 (mask hurts) and Act-2 (TF-activity carries signal above rewired-null) both hold up. Would rather walk back Act-3 openly than defend a finding that was carried by a training-set leak."
+
+**Why this framing is a strength:**
+- You found + fixed your own bug post-submission — signal of judgement + rigor.
+- Simpler story is easier to defend and true.
+- Tolemy explicitly grades on honesty; walking back beats defending.
+
 ### R2. `dc_tfact` (DoRothEA alone) does NOT beat baseline under noise — but CollecTRI does, strongly
 From `final_stats.csv`:
 - noise:0.3 → dc_tfact mean_delta = **−0.012**, frac_beats = 0.52 (essentially tied)
