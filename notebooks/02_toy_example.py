@@ -80,6 +80,112 @@ fig.update_layout(title="toy GRN: TF → target-gene edges (genes coloured by re
 fig
 
 # %% [markdown]
+# ## Real vs **degree-preserving rewired** — the control we compare against
+#
+# In the real project we compare the **real** graph against a **rewired** version — the key control
+# to tell "biology" apart from "any structure with the same shape." **Degree-preserving** = each TF
+# keeps the *same number* of targets AND each gene keeps the *same number* of regulators, but *which*
+# specific edges exist is randomised. Same edge count, same node-degree distribution, biology
+# destroyed.
+#
+# **Why we need it:** if the "real" mask helps as much as a graph with random wiring, then the
+# benefit is just **sparsity + degree distribution**, not the specific TF-target biology.
+#
+# **Note on visualising this:** in a bipartite graph where each gene has *exactly one* TF, rewiring
+# collapses into "reassign each gene to a random TF" — visually indistinguishable from a
+# permutation. To make the real vs rewired distinction visible we need a **multi-connected** graph
+# (each gene regulated by ≥ 2 TFs). We build one here just for illustration — separate from the
+# main toy above.
+
+# %%
+from plotly.subplots import make_subplots
+
+# Illustrative multi-connected bipartite graph: 3 TFs, 12 genes, each gene has 2 TFs (24 edges).
+# Same shape for real + rewired, but different specific edges.
+def make_multi_edges(n_tf, n_genes, k_per_gene, seed):
+    rng = np.random.default_rng(seed)
+    edges = []
+    for g in range(n_genes):
+        tfs = rng.choice(n_tf, size=k_per_gene, replace=False)
+        for t in tfs:
+            edges.append((int(t), g))
+    return edges
+
+edges_real    = make_multi_edges(N_TF, N_GENES, k_per_gene=2, seed=0)
+edges_rewired = make_multi_edges(N_TF, N_GENES, k_per_gene=2, seed=7)
+
+def tf_deg(edges):
+    d = np.zeros(N_TF, int)
+    for t, _ in edges:
+        d[t] += 1
+    return d
+
+print("real    per-TF degrees:", tf_deg(edges_real),
+      "  gene degrees:", np.bincount([g for _, g in edges_real], minlength=N_GENES))
+print("rewired per-TF degrees:", tf_deg(edges_rewired),
+      "  gene degrees:", np.bincount([g for _, g in edges_rewired], minlength=N_GENES))
+
+# %%
+fig = make_subplots(
+    rows=1, cols=2,
+    subplot_titles=("real graph (biology)", "degree-preserving rewired (control)"),
+    horizontal_spacing=0.15,
+)
+
+for col, edges in enumerate([edges_real, edges_rewired], start=1):
+    # draw each edge with the colour of its SOURCE TF
+    for t, g in edges:
+        fig.add_trace(go.Scatter(
+            x=[0, 1], y=[tf_y[t], gene_y[g]], mode="lines",
+            line=dict(color=PAL[t], width=1.4),
+            hoverinfo="none", showlegend=False,
+        ), 1, col)
+    fig.add_trace(go.Scatter(
+        x=[0] * N_TF, y=tf_y, mode="markers+text",
+        text=[f"TF{t}" for t in range(N_TF)], textposition="middle left",
+        marker=dict(size=30, color=[PAL[t] for t in range(N_TF)]),
+        showlegend=False,
+    ), 1, col)
+    fig.add_trace(go.Scatter(
+        x=[1] * N_GENES, y=gene_y, mode="markers+text",
+        text=[f"g{g}" for g in range(N_GENES)], textposition="middle right",
+        marker=dict(size=14, color="lightgray", line=dict(color="black", width=0.5)),
+        showlegend=False,
+    ), 1, col)
+
+fig.update_layout(
+    title="Real vs rewired — each gene has 2 TF regulators. Edge colour = source TF.<br>"
+          "<sub>Both graphs have the same total edges and same per-node degrees, but different specific edges — not a permutation.</sub>",
+    height=520, width=1000,
+)
+for c in (1, 2):
+    fig.update_xaxes(visible=False, range=[-0.3, 1.3], row=1, col=c)
+    fig.update_yaxes(visible=False, row=1, col=c)
+fig
+
+# %% [markdown]
+# **What to notice:**
+#
+# - Left: `TF0` (red edges) connects to a specific set of genes; `TF1` (blue) and `TF2` (green) to
+#   other specific sets. Some genes get red+blue, some blue+green, etc.
+# - Right: the crossings-pattern of edges is genuinely different. `TF0` (red) now targets a
+#   different set of genes. Genes' colour-combinations change too (e.g. a gene that had red+blue
+#   on the left might have blue+green on the right).
+# - **Both graphs pass the same "how many edges? how many per node?" audit** — that's the
+#   "degree-preserving" part. But the specific TF→target combinations are wholly different.
+#
+# **Why this isn't just permutation of hidden units:** if we permuted the hidden units in the real
+# AE, hidden unit "TF0" would still receive input from exactly the genes it did before — we'd just
+# call it "TF7" instead. The network's function is unchanged. In rewiring, the hidden unit named
+# "TF0" now literally receives input from a different set of genes — the function *is* different.
+#
+# **In the real project:** `grn_real` is the AE variant whose encoder mask uses the real DoRothEA
+# adjacency; `grn_rewired` uses a degree-preserving-shuffled version like the right panel above
+# (but with 411 TFs × 8,376 genes and ~30,000 signed edges). Identical architecture, identical
+# training, identical parameter budget — only the mask's specific edges differ. If they perform
+# similarly, the benefit isn't the biology.
+
+# %% [markdown]
 # ## The generative story (the "biology" we control)
 # There are 3 cell types. **Cell type k is the one where TF k is active** — so in a type-k sample,
 # TF k's 4 target genes are elevated, the other 8 are not. Every gene also gets independent
