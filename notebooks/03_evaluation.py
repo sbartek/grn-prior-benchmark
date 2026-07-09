@@ -315,6 +315,62 @@ fig
 # harder, similar T-cell subtypes).
 
 # %% [markdown]
+# ## 9. Post-mortem — per-fold extras (macro AUC, silhouette, cell-type ASW, ARI, NMI)
+#
+# **Added after submission (2026-07-09).** The `clustering.csv` table above was computed on the
+# full-data-trained AE embedding — `all_idx = np.arange(n)` in `scripts/14_clustering.py` line 41.
+# For AE-based rows that's a training-set leak: the AE has seen every sample before its embedding
+# is clustered.
+#
+# `scripts/18_extra_metrics_perfold.py` fixes that: for each of 5 donor-grouped folds, the AE is
+# trained only on train-donors and every metric is computed on **test-donor embeddings** where the
+# AE has never seen the data. Fixed transforms (PCA, dc_tfact, dc_tfact_collectri) are unaffected —
+# they were always per-sample. Numbers below are means across folds.
+
+# %%
+_perfold = pd.read_csv(TAB / "extra_metrics_perfold.csv")
+_full = pd.read_csv(TAB / "extra_metrics.csv") if (TAB / "extra_metrics.csv").exists() else None
+print("per-fold extras:")
+print(_perfold.round(3).to_string(index=False))
+
+# %% [markdown]
+# ### Full-data (R1-confounded) vs per-fold (honest) side by side
+
+# %%
+if _full is not None:
+    _cmp = (_perfold[["model", "macro_f1", "macro_auc", "silhouette", "ct_asw"]]
+            .merge(_full[["model", "macro_f1", "macro_auc", "silhouette", "ct_asw"]],
+                   on="model", suffixes=("_perfold", "_fulldata")))
+    _cmp = _cmp[["model",
+                 "macro_f1_perfold", "macro_f1_fulldata",
+                 "macro_auc_perfold", "macro_auc_fulldata",
+                 "silhouette_perfold", "silhouette_fulldata",
+                 "ct_asw_perfold", "ct_asw_fulldata"]]
+    print(_cmp.round(3).to_string(index=False))
+
+# %% [markdown]
+# ### What changed vs Act 3 of the memo
+#
+# The Act-3 "metric flip" ("PCA wins the supervised probe but loses on clustering") was almost
+# entirely carried by the R1 confound. Corrected picture after per-fold:
+#
+# - **PCA leads on macro-F1, macro AUC, silhouette.** Three of five metrics.
+# - **CollecTRI-ULM leads on ARI and NMI** — but the gap shrunk dramatically:
+#   - ARI: full-data-confounded gap (dc_tfact_collectri 0.304 vs pca 0.124) = 0.180 → per-fold gap = 0.06.
+#   - NMI: 0.204 → 0.06.
+# - **AE-based silhouettes drop 0.10 or more** once the R1 leak is removed — direct proof R1 was
+#   inflating them.
+#
+# The corrected one-liner replaces the memo's Act-3 line:
+# *"PCA and CollecTRI-ULM are close competitors across all five representation-quality metrics;
+# CollecTRI keeps a small ARI/NMI edge (label-agreement) while PCA leads on silhouette (geometric
+# tightness); encoder-mask hurts everywhere. 'Winner depends on the metric' is technically still
+# true, but the effect is 3× smaller than the R1-confounded numbers suggested."*
+#
+# The two other acts hold up: encoder-mask (`grn_real`) is the worst everywhere;
+# TF-activity ULM (esp. CollecTRI) beats the rewired-network null.
+
+# %% [markdown]
 # ## Verdict
 # - **How you use the GRN matters more than whether you use it.** As a learned-**encoder**
 #   constraint it hurts (rewired ≈ real → regularization, not biology). As a **TF-activity

@@ -20,9 +20,12 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from sklearn.cluster import KMeans
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
+    adjusted_rand_score,
     f1_score,
+    normalized_mutual_info_score,
     roc_auc_score,
     silhouette_samples,
     silhouette_score,
@@ -44,7 +47,7 @@ EPOCHS = 250
 
 def per_fold_metrics(model, data, dev, y, donors, labels):
     n = data["X"].shape[0]
-    f1s, aucs, sils, asws = [], [], [], []
+    f1s, aucs, sils, asws, aris, nmis = [], [], [], [], [], []
     for fold_i, (train_idx, test_idx) in enumerate(
         donor_grouped_folds(donors, n_splits=N_FOLDS, seed=SEED)
     ):
@@ -93,11 +96,26 @@ def per_fold_metrics(model, data, dev, y, donors, labels):
         sils.append(sil_fold)
         asws.append(asw_fold)
 
+        # ARI + NMI on TEST-donor embeddings — KMeans with k = # unique test classes
+        y_test = y[test_idx]
+        k_here = len(np.unique(y_test))
+        if k_here >= 2 and len(test_idx) >= k_here:
+            emb_test = StandardScaler().fit_transform(emb[test_idx])
+            lab = KMeans(n_clusters=k_here, random_state=SEED, n_init=10).fit_predict(emb_test)
+            ari_fold = float(adjusted_rand_score(y_test, lab))
+            nmi_fold = float(normalized_mutual_info_score(y_test, lab))
+        else:
+            ari_fold, nmi_fold = np.nan, np.nan
+        aris.append(ari_fold)
+        nmis.append(nmi_fold)
+
         print(f"    fold {fold_i}: f1={f1s[-1]:.3f} auc={aucs[-1]:.3f} "
-              f"sil={sil_fold:.3f} asw={asw_fold:.3f}")
+              f"sil={sil_fold:.3f} asw={asw_fold:.3f} "
+              f"ari={ari_fold:.3f} nmi={nmi_fold:.3f}")
 
     return (float(np.mean(f1s)), float(np.mean(aucs)),
-            float(np.nanmean(sils)), float(np.nanmean(asws)))
+            float(np.nanmean(sils)), float(np.nanmean(asws)),
+            float(np.nanmean(aris)), float(np.nanmean(nmis)))
 
 
 def main():
@@ -114,12 +132,14 @@ def main():
     rows = []
     for m in MODELS:
         print(f"[model] {m}")
-        f1, auc, sil, asw = per_fold_metrics(m, data, dev, y, donors, labels)
+        f1, auc, sil, asw, ari, nmi = per_fold_metrics(m, data, dev, y, donors, labels)
         rows.append(dict(
             model=m, macro_f1=f1, macro_auc=auc,
             silhouette=sil, ct_asw=asw, ct_asw_norm=(asw + 1) / 2,
+            ari=ari, nmi=nmi,
         ))
-        print(f"    -> mean f1={f1:.3f} auc={auc:.3f} sil={sil:.3f} asw={asw:.3f}")
+        print(f"    -> mean f1={f1:.3f} auc={auc:.3f} sil={sil:.3f} asw={asw:.3f} "
+              f"ari={ari:.3f} nmi={nmi:.3f}")
 
     out = pd.DataFrame(rows)
     outfile = ROOT / "results" / "tables" / "extra_metrics_perfold.csv"
