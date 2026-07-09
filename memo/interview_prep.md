@@ -44,36 +44,45 @@ Adversarial pre-mortem of the GRN-prior submission before the review call. **Don
 **Volunteer script (say this preemptively):**
 > "I want to flag something before we get into the clustering results. The AE-based rows in `clustering.csv` — baseline, grn_real, grn_decoder — were trained on all 500 pseudobulks with no held-out set (line 41 of `14_clustering.py`, `all_idx = np.arange(n)`). PCA, dc_tfact and dc_tfact_collectri aren't affected because they're fixed transforms. So the cleanest reading of that table is the fixed-transform comparison: dc_tfact_collectri 0.30 > dc_tfact 0.28 > PCA 0.12 — TF-activity clusters biology tighter than PCA. That's the honest positive result. The AE-vs-PCA rank in that table I'd treat as directional at best. One thing worth noting for the confounded AE rows: grn_real is still below baseline even when both are given the memorization freebie, which strengthens the Act-1 finding rather than weakening it. The proper fix is per-fold-trained AE embeddings — top of my next-round list."
 
-### R1 UPDATE (2026-07-09) — I ran the per-fold fix; Act 3 has to be walked back
+### R1 UPDATE (2026-07-09) — I ran the per-fold fix; Act 3 partially walks back
 
-Re-ran the geometric metrics with **per-fold-trained AE embeddings** (`scripts/18_extra_metrics_perfold.py`, `results/tables/extra_metrics_perfold.csv`). Turns out R1 wasn't a small confound — it was **carrying the entire Act-3 "metric flip" story.**
+Re-ran the geometric metrics with **per-fold-trained AE embeddings** (`scripts/18_extra_metrics_perfold.py`, `results/tables/extra_metrics_perfold.csv`) — including per-fold ARI + NMI + macro AUC-ROC + silhouette + ct_asw.
 
 **Per-fold results (honest — AE only sees train donors):**
 
-| model | macro-F1 | macro AUC | silhouette | ct_asw |
-|---|---|---|---|---|
-| **pca** | **0.864** | **0.994** | **−0.027** | **−0.028** |
-| dc_tfact_collectri | 0.854 | 0.992 | −0.019 | −0.022 |
-| dc_tfact | 0.855 | 0.988 | −0.056 | −0.058 |
-| baseline | 0.757 | 0.983 | −0.081 | −0.078 |
-| grn_decoder | 0.741 | 0.980 | −0.135 | −0.138 |
-| grn_real | 0.702 | 0.961 | −0.124 | −0.126 |
+| model | F1 | AUC | Silhouette | ARI | NMI |
+|---|---|---|---|---|---|
+| **pca** | **0.864** | **0.994** | **−0.027** | 0.171 | 0.549 |
+| **dc_tfact_collectri** | 0.854 | 0.992 | −0.019 | **0.228** | **0.606** |
+| dc_tfact | 0.855 | 0.988 | −0.056 | 0.159 | 0.547 |
+| baseline | 0.757 | 0.983 | −0.081 | 0.190 | 0.577 |
+| grn_decoder | 0.741 | 0.980 | −0.135 | 0.216 | 0.588 |
+| grn_real | 0.702 | 0.961 | −0.124 | 0.138 | 0.522 |
+
+**PCA wins 3 of 5 (F1, AUC, silhouette). CollecTRI-ULM wins 2 of 5 (ARI, NMI).**
 
 **What changed vs the R1-confounded numbers:**
-- AE silhouettes dropped ~0.10 (`baseline` 0.025 → −0.081; `grn_decoder` −0.015 → −0.135). R1 was doing real work in inflating them.
-- PCA silhouette **improved** (−0.10 → −0.03) — no confound, per-fold subsets are smaller/cleaner.
-- **PCA now wins ALL THREE metrics** including silhouette — the metric that Act 3 said PCA loses.
-- CollecTRI-ULM is a very close #2 everywhere. Fixed-transform ordering is stable.
+- **ARI gap collapsed 3×.** Full-data-confounded: `dc_tfact_collectri 0.304 vs pca 0.124` = **0.180 gap.** Per-fold honest: **0.06 gap.** CollecTRI still leads but by much less.
+- **NMI gap collapsed similarly.** Full-data: 0.20 → per-fold: 0.06.
+- **Silhouette flipped.** Full-data (confounded) had baseline > CollecTRI > PCA. Per-fold: PCA > CollecTRI > baseline. Silhouette is where PCA gains ground the most.
+- AE silhouettes dropped ~0.10 once R1 was removed — direct proof of the leak.
 
-**Act 3 (as written) is largely an R1 artefact.** The "PCA smears / GRN clusters tighter" flip does not hold when clustering is measured fairly.
+**Nuanced walk-back — Act 3 is *partially* real, but 3× weaker than the memo claimed:**
+- The "cluster-vs-label" metrics (ARI, NMI) still favor CollecTRI-ULM slightly. So *some* metric-dependence in the winner survives.
+- The "geometric tightness" metric (silhouette) reverses vs the memo — PCA is the tightest.
+- The dramatic reversal implied by the memo's Act 3 is largely R1 artefact.
 
-**Volunteer script (2026-07-09 — use this one, not the older R1 draft above):**
-> "I re-ran the geometric metrics with per-fold AE training yesterday — R1 turned out to carry the entire Act-3 story in my memo. On honest per-fold silhouette, PCA is actually #1 (−0.03), CollecTRI ULM #2 (−0.02) — the 'metric flip' I described doesn't hold. So the honest bottom line is simpler than Act-3: PCA is the strongest baseline across every metric; TF-activity ULM is competitive with PCA and adds interpretability; encoder-mask hurts everywhere. Act-1 (mask hurts) and Act-2 (TF-activity carries signal above rewired-null) both hold up. Would rather walk back Act-3 openly than defend a finding that was carried by a training-set leak."
+**Why silhouette and ARI/NMI disagree:**
+- **Silhouette** = geometric tightness (are same-class points close?). PCA is diffuse but linearly separable → decent when measured on smaller per-fold subsets.
+- **ARI/NMI** = KMeans-found clusters agreeing with labels. Asks whether the *cluster structure* matches biology, which CollecTRI preserves slightly better.
 
-**Why this framing is a strength:**
-- You found + fixed your own bug post-submission — signal of judgement + rigor.
-- Simpler story is easier to defend and true.
-- Tolemy explicitly grades on honesty; walking back beats defending.
+**Volunteer script (2026-07-09 — CORRECTED — use this one):**
+> "I re-ran the metrics with per-fold AE training yesterday, including ARI, NMI, macro AUC, silhouette and cell-type ASW. The picture is more nuanced than my memo's Act 3. Honest summary: PCA is best on the supervised probe, macro AUC, and silhouette. CollecTRI-ULM keeps a small ARI and NMI edge — but the gap shrunk from 0.18 to 0.06 once R1 was fixed. So the 'metric flip' story is partially true — CollecTRI does still beat PCA on cluster-vs-label agreement — but the effect is much more modest than the R1-confounded numbers suggested. Corrected one-liner: PCA and CollecTRI-ULM are close competitors across all five representation-quality metrics; CollecTRI keeps a small ARI/NMI edge (label-agreement), PCA leads on silhouette (geometric tightness), and encoder-mask hurts everywhere. Act 1 and Act 2 hold up unchanged."
+
+**Why this is still a strength:**
+- You found + fixed your own bug post-submission — judgement + rigor.
+- Partial walk-back is more honest than either "everything was right" OR "everything was wrong."
+- Tolemy grades on intellectual honesty — nuanced correction demonstrates it better than blanket concession.
 
 ### R2. `dc_tfact` (DoRothEA alone) does NOT beat baseline under noise — but CollecTRI does, strongly
 From `final_stats.csv`:
@@ -220,3 +229,26 @@ Not something to volunteer — but know it in case Caelan opens the density figu
 ## Post-call
 
 Send tight follow-up email within 2h: one thing you enjoyed discussing, one thing you learned from Caelan's questions, one item you agreed you'd think more about. If R1 came up, restate concession and how you'd fix it — turns weakness into follow-up commitment.
+
+---
+
+## Story-arc rehearsal — 90-120s, out loud
+
+**Opening (~10s):**
+> "The take-home asked whether a DoRothEA GRN-prior helps ML embeddings capture cell-type biology better than a matched non-graph baseline. I approached it as three connected questions."
+
+**Act 1 — encoder-mask hurts (~30s):**
+> "First: bake the graph into the encoder. Force each hidden unit to be a TF, only wired to its target genes. This underperformed everywhere — 7 macro-F1 points below baseline at full data, worse at low-data and noise. And critically: when I swapped the real graph for a degree-preserving rewired one, performance was similar or better. Rewired A-subset actually beat the real A-subset in the density ablation at low-data. Any tiny effect wasn't the biology, it was generic regularization. Softening the constraint didn't rescue it. Bottom line: don't bake the graph into a large trained model."
+
+**Act 2 — TF-activity works (~35s):**
+> "Second: use the same graph the classical way — as a fixed ULM TF-activity transform. This carried real biology. It beat two orthogonal nulls: matched-dim random projection and a rewired-network ULM control I ran as a B3 self-review fix. Won at every low-data condition on paired 25-fold comparisons. CollecTRI extended the win to noise conditions where DoRothEA alone was a wash. Replicated on a second dataset — COVID PBMC. TF-activity is about 0.04 macro-F1 above the rewired-network null at full data — modest but real."
+
+**Act 3 — the walk-back (~30s — SLOW DOWN, this is the intellectual-honesty move):**
+> "Third — and this is where I want to partially walk back the memo. I originally reported a 'metric flip': PCA wins the supervised probe but loses on clustering. That result rested on `14_clustering.py` line 41, which trains the AEs on all 500 samples before clustering. R1 confound in my self-review. Yesterday I ran the per-fold version — AE trained on train donors only, everything measured on held-out. Result: on ARI and NMI, CollecTRI-ULM still keeps a small edge over PCA — but the gap shrunk from 0.18 to 0.06. On silhouette, PCA actually leads. So the metric flip is partially real but 3× smaller than my memo suggested. Corrected takeaway: PCA and CollecTRI-ULM are close competitors across all five metrics; encoder-mask hurts everywhere. Acts 1 and 2 hold up unchanged."
+
+**Closing (~10s — confident, not apologetic):**
+> "If I had two more weeks, the highest-leverage next test is perturbation data — GRN priors should pay off more when you have interventional signal, which is where a lot of therapeutic development ML lives."
+
+**Delivery notes:**
+- Slow down on Act 3. That's the honesty move — rushing it looks defensive.
+- Land closing with confidence, not apology. You improved on your own submission overnight — that's a strength.
