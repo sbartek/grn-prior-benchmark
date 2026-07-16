@@ -406,6 +406,37 @@ Clean framing: `a` = sample's baseline expression ignoring this TF. `b` = how mu
 
 ---
 
+## Q17d. What clustering algorithm and metrics did we use?
+
+<details>
+<summary>Answer</summary>
+
+**Algorithm — KMeans:**
+- Set `k = 15` (number of true cell types).
+- Init 15 random centers in the embedding space.
+- Repeat: assign each sample to nearest center → move each center to mean of its assigned samples.
+- Until nothing moves. Purely geometric; no true labels used during clustering.
+
+**Metrics — ARI + NMI (both scored against true cell-type labels):**
+
+**ARI (Adjusted Rand Index) — pair agreement.**
+For every pair of samples, check: do they agree (same-and-same, or different-and-different) in both true labels and clusters? ARI = fraction agreeing, adjusted for chance. Range [−1, 1], 0 = random.
+
+**NMI (Normalized Mutual Information) — information theory.**
+How much does knowing the cluster tell you about the true type? Range [0, 1]. Scaled to be comparable across cluster counts.
+
+**Why both:** ARI is pair-based, NMI is info-theoretic. They agree in ordering but disagree in magnitude — reporting both protects against metric gaming (scIB convention).
+
+**In your `clustering.csv`:**
+- pca ARI 0.124 / NMI 0.390 (weak).
+- dc_tfact_collectri ARI 0.304 / NMI 0.594 (moderate — best fixed transform).
+
+Low absolute values reflect PBMC cell types genuinely overlapping in expression — not a metric flaw.
+
+</details>
+
+---
+
 ## Q17c. What is scIB?
 
 <details>
